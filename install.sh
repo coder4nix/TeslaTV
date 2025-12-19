@@ -394,11 +394,13 @@ configure_nginx() {
     # Frage nach IPTV Server für Proxy (CORS-Fix)
     echo ""
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${BLUE}IPTV Server Proxy (CORS-Fix)${NC}"
-    echo -e "${NC}   Damit die App auf den IPTV-Server zugreifen kann,${NC}"
-    echo -e "${NC}   wird ein Proxy eingerichtet.${NC}"
+    echo -e "${BLUE}IPTV Backend Server (CORS-Fix)${NC}"
+    echo -e "${NC}   WICHTIG: Hier wird nach Ihrem IPTV-Backend gefragt,${NC}"
+    echo -e "${NC}   NICHT nach Ihrer Tesla TV Domain!${NC}"
     echo ""
-    read -p "   IPTV Server IP/Domain (z.B. 144.76.200.209): " IPTV_SERVER
+    echo -e "${NC}   Geben Sie die IP/Domain Ihres XuiOne IPTV-Servers ein:${NC}"
+    echo ""
+    read -p "   IPTV Backend Server (z.B. 144.76.200.209): " IPTV_SERVER
 
     if [[ -z "$IPTV_SERVER" ]]; then
         print_warning "Kein IPTV Server angegeben, Proxy wird nicht konfiguriert"
