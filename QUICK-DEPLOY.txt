@@ -1,0 +1,83 @@
+═══════════════════════════════════════════════════════════════
+ TESLA TV - SCHNELL-DEPLOYMENT FÜR HETZNER VPS
+═══════════════════════════════════════════════════════════════
+
+📋 VORAUSSETZUNGEN:
+  ✓ Ubuntu 22.04 VPS bei Hetzner
+  ✓ Root-Zugriff via SSH
+  ✓ Domain (optional) oder VPS-IP
+
+═══════════════════════════════════════════════════════════════
+
+🚀 SCHNELLSTART (5 Schritte):
+
+1️⃣  VPS VORBEREITEN (einmalig)
+   ────────────────────────────
+   Verbinden: ssh root@YOUR_VPS_IP
+
+   Befehle ausführen:
+   apt update && apt upgrade -y
+   apt install nginx -y
+   mkdir -p /var/www/tesla-tv
+   systemctl start nginx
+   systemctl enable nginx
+
+2️⃣  NGINX KONFIGURIEREN (einmalig)
+   ────────────────────────────────
+   nano /etc/nginx/sites-available/tesla-tv
+
+   Inhalt einfügen (siehe DEPLOYMENT.md für vollständige Config)
+   Dann:
+   ln -s /etc/nginx/sites-available/tesla-tv /etc/nginx/sites-enabled/
+   nginx -t
+   systemctl reload nginx
+
+3️⃣  DEPLOY-SCRIPT ANPASSEN
+   ──────────────────────────
+   Öffnen: deploy.bat
+   Ändern: SET VPS_IP=YOUR_VPS_IP
+   Speichern
+
+4️⃣  DEPLOYEN
+   ──────────
+   Doppelklick auf: deploy.bat
+
+   Oder manuell:
+   npm run build
+   scp -r dist\* root@YOUR_VPS_IP:/var/www/tesla-tv/
+
+5️⃣  TESTEN
+   ─────────
+   Browser öffnen: http://YOUR_VPS_IP
+
+═══════════════════════════════════════════════════════════════
+
+🔒 OPTIONAL: SSL EINRICHTEN
+
+   apt install certbot python3-certbot-nginx -y
+   certbot --nginx -d your-domain.com
+
+═══════════════════════════════════════════════════════════════
+
+📝 WICHTIGE DATEIEN:
+
+   ✓ DEPLOYMENT.md    - Vollständige Anleitung
+   ✓ deploy.bat       - Automatisches Deployment-Script
+   ✓ dist/            - Production-Build (bereits erstellt!)
+
+═══════════════════════════════════════════════════════════════
+
+🆘 PROBLEME?
+
+   Nginx Logs:      tail -f /var/log/nginx/error.log
+   Nginx Test:      nginx -t
+   Nginx Neustart:  systemctl restart nginx
+   Berechtigungen:  chown -R www-data:www-data /var/www/tesla-tv
+
+═══════════════════════════════════════════════════════════════
+
+✅ Nach dem ersten Setup ist jedes weitere Deployment nur noch:
+
+   deploy.bat ausführen - FERTIG! 🎉
+
+═══════════════════════════════════════════════════════════════
