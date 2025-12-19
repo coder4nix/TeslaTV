@@ -34,7 +34,7 @@ npm run build
 ssh root@YOUR_VPS_IP
 
 # 2. Installation Script herunterladen und ausführen
-wget https://raw.githubusercontent.com/YOUR_USERNAME/tesla-tv/main/install.sh
+wget https://raw.githubusercontent.com/worldofiptvcom/tesla-tv/main/install.sh
 chmod +x install.sh
 ./install.sh
 ```
