@@ -335,6 +335,12 @@ install_dependencies() {
     print_info "Installiere npm Pakete..."
     npm install --production=false
 
+    # Fix permissions for node_modules binaries
+    print_info "Setze Berechtigungen für node_modules..."
+    if [[ -d "node_modules/.bin" ]]; then
+        chmod -R +x node_modules/.bin/ 2>/dev/null || true
+    fi
+
     print_success "Abhängigkeiten installiert"
 }
 
@@ -344,7 +350,26 @@ build_application() {
     cd "$APP_DIR"
 
     print_info "Baue Production Version..."
-    npm run build
+
+    # Try npm run build first
+    if ! npm run build 2>/dev/null; then
+        print_warning "npm run build fehlgeschlagen, versuche npx..."
+
+        # Fallback to npx vite build
+        if ! npx vite build; then
+            print_error "Build fehlgeschlagen"
+            print_info "Versuche manuelle Permission-Korrektur..."
+
+            # Last resort: fix permissions and try again
+            chmod -R 755 node_modules 2>/dev/null || true
+            chmod -R +x node_modules/.bin/* 2>/dev/null || true
+
+            if ! npm run build; then
+                print_error "Build endgültig fehlgeschlagen"
+                exit 1
+            fi
+        fi
+    fi
 
     if [[ ! -d "dist" ]]; then
         print_error "Build fehlgeschlagen - dist/ Ordner nicht gefunden"
