@@ -14,12 +14,13 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Konfiguration - BITTE ANPASSEN!
-GITHUB_REPO="https://github.com/YOUR_USERNAME/tesla-tv.git"  # ÄNDERN!
-DOMAIN=""  # Optional: your-domain.com
+# Konfiguration
+GITHUB_REPO=""
+DOMAIN=""
 APP_DIR="/var/www/tesla-tv"
 NGINX_CONFIG="/etc/nginx/sites-available/tesla-tv"
 NODE_VERSION="18"
+SETUP_SSL="n"
 
 ###############################################################################
 # Helper Functions
@@ -73,6 +74,137 @@ check_ubuntu_version() {
     else
         print_success "Ubuntu 22.04 erkannt"
     fi
+}
+
+interactive_config() {
+    print_header "Konfigurations-Assistent"
+
+    echo -e "${BLUE}Bitte geben Sie die folgenden Informationen ein:${NC}"
+    echo ""
+
+    # GitHub Repository URL
+    while true; do
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${BLUE}1. GitHub Repository URL${NC}"
+        echo -e "${NC}   Beispiel: https://github.com/username/tesla-tv.git${NC}"
+        echo ""
+        read -p "   GitHub URL: " GITHUB_REPO
+
+        # Validierung
+        if [[ -z "$GITHUB_REPO" ]]; then
+            print_error "GitHub URL darf nicht leer sein!"
+            echo ""
+            continue
+        fi
+
+        if [[ ! "$GITHUB_REPO" =~ ^https://github.com/.+/.+\.git$ ]] && [[ ! "$GITHUB_REPO" =~ ^git@github.com:.+/.+\.git$ ]]; then
+            print_warning "URL Format scheint nicht korrekt zu sein"
+            read -p "   Trotzdem verwenden? (y/n) " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                echo ""
+                continue
+            fi
+        fi
+
+        print_success "GitHub URL: $GITHUB_REPO"
+        echo ""
+        break
+    done
+
+    # Domain (Optional)
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}2. Domain Name (Optional)${NC}"
+    echo -e "${NC}   Wenn Sie eine Domain haben, geben Sie diese ein.${NC}"
+    echo -e "${NC}   Leer lassen für IP-basierte Installation.${NC}"
+    echo ""
+    read -p "   Domain (oder Enter für keine): " DOMAIN
+
+    if [[ -n "$DOMAIN" ]]; then
+        print_success "Domain: $DOMAIN"
+    else
+        SERVER_IP=$(hostname -I | awk '{print $1}')
+        print_info "Keine Domain angegeben, verwende IP: $SERVER_IP"
+    fi
+    echo ""
+
+    # SSL Setup
+    if [[ -n "$DOMAIN" ]]; then
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${BLUE}3. SSL Zertifikat einrichten?${NC}"
+        echo -e "${NC}   Let's Encrypt SSL für HTTPS (empfohlen)${NC}"
+        echo ""
+        read -p "   SSL einrichten? (y/n) " -n 1 -r SETUP_SSL
+        echo ""
+
+        if [[ $SETUP_SSL =~ ^[Yy]$ ]]; then
+            print_success "SSL wird eingerichtet für: $DOMAIN"
+
+            # Email für Let's Encrypt
+            echo ""
+            echo -e "${BLUE}   Email-Adresse für SSL-Benachrichtigungen:${NC}"
+            read -p "   Email: " SSL_EMAIL
+
+            if [[ -z "$SSL_EMAIL" ]]; then
+                print_warning "Keine Email angegeben, fortfahren ohne Email"
+            fi
+        else
+            print_info "SSL-Setup wird übersprungen"
+        fi
+        echo ""
+    fi
+
+    # Installation Directory
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}4. Installations-Verzeichnis${NC}"
+    echo -e "${NC}   Standard: /var/www/tesla-tv${NC}"
+    echo ""
+    read -p "   Verzeichnis (oder Enter für Standard): " custom_dir
+
+    if [[ -n "$custom_dir" ]]; then
+        APP_DIR="$custom_dir"
+    fi
+
+    print_success "Installations-Verzeichnis: $APP_DIR"
+    echo ""
+
+    # Zusammenfassung
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}Zusammenfassung der Konfiguration:${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "  ${BLUE}GitHub Repository:${NC}  $GITHUB_REPO"
+    echo -e "  ${BLUE}Domain:${NC}             ${DOMAIN:-Keine (IP-basiert)}"
+    echo -e "  ${BLUE}SSL:${NC}                ${SETUP_SSL}"
+    if [[ -n "$SSL_EMAIL" ]]; then
+        echo -e "  ${BLUE}SSL Email:${NC}          $SSL_EMAIL"
+    fi
+    echo -e "  ${BLUE}Install Verzeichnis:${NC} $APP_DIR"
+    echo ""
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+
+    read -p "Mit dieser Konfiguration fortfahren? (y/n) " -n 1 -r
+    echo ""
+
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_warning "Installation abgebrochen"
+        exit 0
+    fi
+
+    print_success "Konfiguration bestätigt, starte Installation..."
+    echo ""
+
+    # Konfiguration speichern für spätere Updates
+    cat > /tmp/tesla-tv-config.sh << EOF
+GITHUB_REPO="$GITHUB_REPO"
+DOMAIN="$DOMAIN"
+APP_DIR="$APP_DIR"
+SSL_EMAIL="$SSL_EMAIL"
+SETUP_SSL="$SETUP_SSL"
+EOF
+
+    print_info "Konfiguration gespeichert in /tmp/tesla-tv-config.sh"
 }
 
 ###############################################################################
@@ -172,12 +304,6 @@ create_directories() {
 
 clone_repository() {
     print_header "GitHub Repository klonen"
-
-    if [[ "$GITHUB_REPO" == *"YOUR_USERNAME"* ]]; then
-        print_error "GITHUB_REPO wurde nicht angepasst!"
-        print_info "Bitte bearbeiten Sie das Script und setzen Sie die korrekte GitHub URL"
-        exit 1
-    fi
 
     print_info "Klone Repository: $GITHUB_REPO"
 
@@ -329,7 +455,7 @@ EOF
 }
 
 setup_ssl() {
-    print_header "SSL Zertifikat (Optional)"
+    print_header "SSL Zertifikat Setup"
 
     if [[ -z "$DOMAIN" ]]; then
         print_warning "Keine Domain konfiguriert, überspringe SSL-Setup"
@@ -337,21 +463,30 @@ setup_ssl() {
         return
     fi
 
-    read -p "Möchten Sie jetzt SSL mit Let's Encrypt einrichten? (y/n) " -n 1 -r
-    echo
+    if [[ ! $SETUP_SSL =~ ^[Yy]$ ]]; then
+        print_info "SSL-Setup wurde bei der Konfiguration übersprungen"
+        print_info "SSL kann später manuell eingerichtet werden mit:"
+        print_info "certbot --nginx -d $DOMAIN"
+        return
+    fi
 
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        print_info "Installiere Certbot..."
-        apt install -y -qq certbot python3-certbot-nginx
+    print_info "Installiere Certbot..."
+    apt install -y -qq certbot python3-certbot-nginx
 
-        print_info "Erstelle SSL Zertifikat für $DOMAIN..."
-        certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email || {
+    print_info "Erstelle SSL Zertifikat für $DOMAIN..."
+
+    if [[ -n "$SSL_EMAIL" ]]; then
+        certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --email "$SSL_EMAIL" || {
             print_warning "SSL-Setup fehlgeschlagen"
             print_info "Sie können es später manuell einrichten mit:"
             print_info "certbot --nginx -d $DOMAIN"
         }
     else
-        print_info "SSL-Setup übersprungen"
+        certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email || {
+            print_warning "SSL-Setup fehlgeschlagen"
+            print_info "Sie können es später manuell einrichten mit:"
+            print_info "certbot --nginx -d $DOMAIN"
+        }
     fi
 }
 
@@ -396,38 +531,6 @@ EOF
     print_success "Update-Script erstellt: $APP_DIR/update.sh"
 }
 
-setup_systemd_service() {
-    print_header "Systemd Service (Optional)"
-
-    read -p "Möchten Sie einen Systemd Service einrichten? (y/n) " -n 1 -r
-    echo
-
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        print_info "Systemd Service übersprungen"
-        return
-    fi
-
-    cat > /etc/systemd/system/tesla-tv.service << EOF
-[Unit]
-Description=Tesla TV IPTV Application
-After=network.target
-
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=$APP_DIR
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    systemctl daemon-reload
-    systemctl enable tesla-tv.service > /dev/null 2>&1
-
-    print_success "Systemd Service erstellt und aktiviert"
-}
 
 final_checks() {
     print_header "Abschluss-Checks"
@@ -513,6 +616,9 @@ EOF
     check_root
     check_ubuntu_version
 
+    # Interactive Configuration
+    interactive_config
+
     # Installation
     update_system
     install_nodejs
@@ -525,7 +631,6 @@ EOF
     configure_nginx
     setup_ssl
     create_update_script
-    setup_systemd_service
 
     # Final
     final_checks

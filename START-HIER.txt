@@ -56,26 +56,7 @@ Falls nach Passwort gefragt:
 
 
 ┌─────────────────────────────────────────────────────────────────┐
-│ SCHRITT 3: Installation Script anpassen                        │
-└─────────────────────────────────────────────────────────────────┘
-
-Öffnen Sie: install.sh
-
-Ändern Sie Zeile 20:
-  VORHER: GITHUB_REPO="https://github.com/YOUR_USERNAME/tesla-tv.git"
-  NACHHER: GITHUB_REPO="https://github.com/IHR_USERNAME/tesla-tv.git"
-
-Optional - Zeile 21 (falls Sie eine Domain haben):
-  DOMAIN="your-domain.com"
-
-Speichern und erneut pushen:
-  git add install.sh
-  git commit -m "Update GitHub URL in install script"
-  git push
-
-
-┌─────────────────────────────────────────────────────────────────┐
-│ SCHRITT 4: Auf VPS installieren                                │
+│ SCHRITT 3: Auf VPS installieren (INTERAKTIV!)                  │
 └─────────────────────────────────────────────────────────────────┘
 
 SSH Verbindung zu Ihrem Hetzner VPS:
@@ -93,12 +74,21 @@ Dann auf dem VPS:
   # Installation starten
   ./install.sh
 
-Das Script führt ALLES automatisch aus!
+Das Script fragt Sie INTERAKTIV nach:
+  ✓ GitHub Repository URL
+  ✓ Domain Name (optional)
+  ✓ SSL Zertifikat einrichten? (ja/nein)
+  ✓ Email für SSL (optional)
+  ✓ Installations-Verzeichnis (Standard: /var/www/tesla-tv)
+
+Sie sehen eine Zusammenfassung und müssen bestätigen.
+Dann läuft ALLES automatisch!
+
 Dauer: ca. 5-10 Minuten
 
 
 ┌─────────────────────────────────────────────────────────────────┐
-│ SCHRITT 5: Fertig! 🎉                                          │
+│ SCHRITT 4: Fertig! 🎉                                          │
 └─────────────────────────────────────────────────────────────────┘
 
 Nach erfolgreicher Installation:
