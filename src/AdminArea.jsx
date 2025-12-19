@@ -125,6 +125,15 @@ export default function AdminArea() {
     }
 
     let baseUrl = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;
+
+    // Support relative URLs (starting with /) for proxy setup
+    if (baseUrl.startsWith('/')) {
+      // Relative URL - don't add http://
+      const fullUrl = `${baseUrl}/${accessCode}/`;
+      return fullUrl;
+    }
+
+    // Absolute URL - add http:// if missing
     if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
       baseUrl = 'http://' + baseUrl;
     }
