@@ -391,6 +391,25 @@ configure_nginx() {
         print_info "Verwende Domain: $SERVER_NAME"
     fi
 
+    # Frage nach IPTV Server für Proxy (CORS-Fix)
+    echo ""
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}IPTV Server Proxy (CORS-Fix)${NC}"
+    echo -e "${NC}   Damit die App auf den IPTV-Server zugreifen kann,${NC}"
+    echo -e "${NC}   wird ein Proxy eingerichtet.${NC}"
+    echo ""
+    read -p "   IPTV Server IP/Domain (z.B. 144.76.200.209): " IPTV_SERVER
+
+    if [[ -z "$IPTV_SERVER" ]]; then
+        print_warning "Kein IPTV Server angegeben, Proxy wird nicht konfiguriert"
+        IPTV_SERVER=""
+    else
+        print_success "IPTV Server: $IPTV_SERVER"
+        # In Konfiguration speichern
+        echo "IPTV_SERVER=\"$IPTV_SERVER\"" >> /tmp/tesla-tv-config.sh
+    fi
+    echo ""
+
     print_info "Erstelle Nginx Konfiguration..."
 
     cat > "$NGINX_CONFIG" << EOF
@@ -418,10 +437,55 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
+EOF
+
+    # IPTV Proxy nur hinzufügen wenn Server angegeben
+    if [[ -n "$IPTV_SERVER" ]]; then
+        cat >> "$NGINX_CONFIG" << 'EOF'
+
+    # IPTV API Proxy (CORS-Fix)
+    location /api/ {
+EOF
+        cat >> "$NGINX_CONFIG" << EOF
+        proxy_pass http://$IPTV_SERVER/;
+        proxy_set_header Host $IPTV_SERVER;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # CORS Headers
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization" always;
+
+        # Preflight requests
+        if (\$request_method = 'OPTIONS') {
+            add_header Access-Control-Allow-Origin "*";
+            add_header Access-Control-Allow-Methods "GET, POST, OPTIONS";
+            add_header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization";
+            add_header Content-Length 0;
+            add_header Content-Type text/plain;
+            return 200;
+        }
+
+        # Timeouts für Streaming
+        proxy_connect_timeout 600;
+        proxy_send_timeout 600;
+        proxy_read_timeout 600;
+        send_timeout 600;
+
+        # Buffering deaktivieren
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+EOF
+    fi
+
+    cat >> "$NGINX_CONFIG" << 'EOF'
 
     # SPA Routing
     location / {
-        try_files \$uri \$uri/ /index.html;
+        try_files $uri $uri/ /index.html;
     }
 
     # Cache statische Assets (1 Jahr)
@@ -609,9 +673,199 @@ print_summary() {
     echo ""
     echo -e "${BLUE}📝 Nützliche Befehle:${NC}"
     echo -e "   ${YELLOW}Update App:${NC}          cd $APP_DIR && ./update.sh"
+    echo -e "   ${YELLOW}Deinstallieren:${NC}      ./install.sh --uninstall"
     echo -e "   ${YELLOW}Nginx Logs:${NC}          tail -f /var/log/nginx/tesla-tv-error.log"
     echo -e "   ${YELLOW}Nginx Neustart:${NC}      systemctl restart nginx"
     echo -e "   ${YELLOW}SSL einrichten:${NC}      certbot --nginx -d your-domain.com"
+    echo ""
+
+    if [[ -n "$IPTV_SERVER" ]]; then
+        echo -e "${BLUE}🔧 IPTV Konfiguration (WICHTIG):${NC}"
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "   In den Admin-Einstellungen verwenden Sie:"
+        echo ""
+        echo -e "   ${GREEN}Server URL:${NC} /api"
+        echo -e "   ${GREEN}Port:${NC}       (leer lassen)"
+        echo ""
+        echo -e "   ${BLUE}ℹ${NC}  Der Proxy leitet Anfragen automatisch zu $IPTV_SERVER weiter"
+        echo -e "   ${BLUE}ℹ${NC}  Dies behebt CORS-Probleme"
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+    fi
+}
+
+###############################################################################
+# Uninstall Function
+###############################################################################
+
+uninstall() {
+    clear
+
+    echo -e "${RED}"
+    cat << "EOF"
+╔════════════════════════════════════════════════════════════════╗
+║                                                                ║
+║                  TESLA TV DEINSTALLATION                       ║
+║                                                                ║
+║                   ⚠️  WARNUNG: Löscht alles!                   ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+EOF
+    echo -e "${NC}"
+
+    print_warning "Dies wird ALLE Tesla TV Komponenten entfernen!"
+    echo ""
+
+    # Lade gespeicherte Konfiguration falls vorhanden
+    if [[ -f /tmp/tesla-tv-config.sh ]]; then
+        source /tmp/tesla-tv-config.sh
+    else
+        # Standard-Werte
+        APP_DIR="/var/www/tesla-tv"
+        NGINX_CONFIG="/etc/nginx/sites-available/tesla-tv"
+    fi
+
+    # Zeige was entfernt wird
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${RED}Folgendes wird entfernt:${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+
+    # Prüfe was existiert
+    ITEMS_TO_REMOVE=()
+
+    if [[ -d "$APP_DIR" ]]; then
+        echo -e "  ${RED}✗${NC} App Verzeichnis: $APP_DIR"
+        ITEMS_TO_REMOVE+=("app_dir")
+    fi
+
+    if [[ -f "$NGINX_CONFIG" ]]; then
+        echo -e "  ${RED}✗${NC} Nginx Konfiguration: $NGINX_CONFIG"
+        ITEMS_TO_REMOVE+=("nginx_config")
+    fi
+
+    if [[ -L /etc/nginx/sites-enabled/tesla-tv ]]; then
+        echo -e "  ${RED}✗${NC} Nginx Site Link: /etc/nginx/sites-enabled/tesla-tv"
+        ITEMS_TO_REMOVE+=("nginx_link")
+    fi
+
+    if [[ -f /tmp/tesla-tv-config.sh ]]; then
+        echo -e "  ${RED}✗${NC} Konfigurationsdatei: /tmp/tesla-tv-config.sh"
+        ITEMS_TO_REMOVE+=("config")
+    fi
+
+    # Prüfe auf SSL Zertifikate
+    if [[ -n "$DOMAIN" ]] && [[ -d "/etc/letsencrypt/live/$DOMAIN" ]]; then
+        echo -e "  ${RED}✗${NC} SSL Zertifikat für: $DOMAIN"
+        ITEMS_TO_REMOVE+=("ssl")
+    fi
+
+    # Logs
+    if [[ -f /var/log/nginx/tesla-tv-access.log ]] || [[ -f /var/log/nginx/tesla-tv-error.log ]]; then
+        echo -e "  ${RED}✗${NC} Nginx Log-Dateien"
+        ITEMS_TO_REMOVE+=("logs")
+    fi
+
+    echo ""
+
+    if [[ ${#ITEMS_TO_REMOVE[@]} -eq 0 ]]; then
+        print_info "Keine Tesla TV Installation gefunden"
+        exit 0
+    fi
+
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "${RED}⚠️  WICHTIG: Installierte Pakete (Nginx, Node.js) werden NICHT entfernt${NC}"
+    echo -e "${NC}   Diese können Sie manuell deinstallieren mit:${NC}"
+    echo -e "${NC}   apt remove nginx nodejs${NC}"
+    echo ""
+
+    read -p "Möchten Sie fortfahren? (yes/NO) " -r
+    echo
+
+    if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+        print_info "Deinstallation abgebrochen"
+        exit 0
+    fi
+
+    print_header "Deinstallation wird ausgeführt"
+
+    # App Verzeichnis entfernen
+    if [[ " ${ITEMS_TO_REMOVE[@]} " =~ " app_dir " ]]; then
+        print_info "Entferne App Verzeichnis..."
+        rm -rf "$APP_DIR"
+        print_success "App Verzeichnis entfernt"
+    fi
+
+    # Nginx Site Link entfernen
+    if [[ " ${ITEMS_TO_REMOVE[@]} " =~ " nginx_link " ]]; then
+        print_info "Deaktiviere Nginx Site..."
+        rm -f /etc/nginx/sites-enabled/tesla-tv
+        print_success "Nginx Site deaktiviert"
+    fi
+
+    # Nginx Konfiguration entfernen
+    if [[ " ${ITEMS_TO_REMOVE[@]} " =~ " nginx_config " ]]; then
+        print_info "Entferne Nginx Konfiguration..."
+        rm -f "$NGINX_CONFIG"
+        print_success "Nginx Konfiguration entfernt"
+    fi
+
+    # SSL Zertifikat entfernen
+    if [[ " ${ITEMS_TO_REMOVE[@]} " =~ " ssl " ]]; then
+        echo ""
+        read -p "SSL Zertifikat für $DOMAIN auch entfernen? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            print_info "Entferne SSL Zertifikat..."
+            certbot delete --cert-name "$DOMAIN" --non-interactive 2>/dev/null || true
+            print_success "SSL Zertifikat entfernt"
+        fi
+    fi
+
+    # Logs entfernen
+    if [[ " ${ITEMS_TO_REMOVE[@]} " =~ " logs " ]]; then
+        print_info "Entferne Log-Dateien..."
+        rm -f /var/log/nginx/tesla-tv-access.log
+        rm -f /var/log/nginx/tesla-tv-error.log
+        print_success "Log-Dateien entfernt"
+    fi
+
+    # Konfigurationsdatei entfernen
+    if [[ " ${ITEMS_TO_REMOVE[@]} " =~ " config " ]]; then
+        print_info "Entferne Konfigurationsdatei..."
+        rm -f /tmp/tesla-tv-config.sh
+        print_success "Konfigurationsdatei entfernt"
+    fi
+
+    # Nginx neu laden
+    print_info "Lade Nginx neu..."
+    nginx -t > /dev/null 2>&1 && systemctl reload nginx || {
+        print_warning "Nginx Reload fehlgeschlagen, versuche Restart..."
+        systemctl restart nginx
+    }
+
+    # Finale Meldung
+    echo ""
+    echo -e "${GREEN}"
+    cat << "EOF"
+╔════════════════════════════════════════════════════════════════╗
+║                                                                ║
+║              DEINSTALLATION ABGESCHLOSSEN!                     ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+EOF
+    echo -e "${NC}"
+
+    echo -e "${BLUE}Tesla TV wurde vollständig entfernt.${NC}"
+    echo ""
+    echo -e "${YELLOW}Hinweis:${NC} Installierte System-Pakete wurden behalten:"
+    echo "  • Nginx"
+    echo "  • Node.js"
+    echo ""
+    echo "Um diese zu entfernen:"
+    echo "  apt remove --purge nginx nodejs"
+    echo "  apt autoremove"
     echo ""
 }
 
@@ -664,5 +918,24 @@ EOF
     print_info "Ende: $(date)"
 }
 
-# Run main installation
-main "$@"
+# Command line argument handling
+case "${1:-}" in
+    --uninstall|uninstall|-u)
+        check_root
+        uninstall
+        ;;
+    --help|-h|help)
+        echo "Tesla TV Installation Script"
+        echo ""
+        echo "Verwendung:"
+        echo "  $0              - Installation starten (interaktiv)"
+        echo "  $0 --uninstall  - Tesla TV deinstallieren"
+        echo "  $0 --help       - Diese Hilfe anzeigen"
+        echo ""
+        exit 0
+        ;;
+    *)
+        # Run main installation
+        main "$@"
+        ;;
+esac
