@@ -137,6 +137,17 @@ export default function AdminArea() {
     if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
       baseUrl = 'http://' + baseUrl;
     }
+
+    // AUTOMATIC PROXY: If site is HTTPS but server is HTTP, use /api/ proxy
+    const isPageHttps = window.location.protocol === 'https:';
+    const isServerHttp = baseUrl.startsWith('http://');
+
+    if (isPageHttps && isServerHttp) {
+      // Use proxy to avoid Mixed Content error
+      console.log('🔒 HTTPS detected - using /api/ proxy for HTTP server');
+      return `/api/${accessCode}/`;
+    }
+
     const fullUrl = port ? `${baseUrl}:${port}/${accessCode}/` : `${baseUrl}/${accessCode}/`;
     return fullUrl;
   };
