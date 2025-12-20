@@ -143,9 +143,9 @@ export default function AdminArea() {
     const isServerHttp = baseUrl.startsWith('http://');
 
     // Check if server is on different origin (domain/port)
-    const serverUrl = new URL(port ? `${baseUrl}:${port}` : baseUrl);
+    const serverUrlObj = new URL(port ? `${baseUrl}:${port}` : baseUrl);
     const currentOrigin = window.location.origin;
-    const serverOrigin = serverUrl.origin;
+    const serverOrigin = serverUrlObj.origin;
     const isCrossOrigin = currentOrigin !== serverOrigin;
 
     // Use proxy if: (1) HTTPS→HTTP (Mixed Content) OR (2) Cross-Origin (CORS)
