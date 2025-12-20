@@ -52,12 +52,28 @@ export default function Admin() {
       return `/api/${accessCode}/`;
     }
 
-    // In production, use direct URL
+    // In production, check for proxy needs
     let baseUrl = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;
+
+    // Support relative URLs (starting with /) for proxy setup
+    if (baseUrl.startsWith('/')) {
+      // Relative URL - use as-is for proxy
+      return `${baseUrl}/${accessCode}/`;
+    }
 
     // Add protocol if missing
     if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
       baseUrl = 'http://' + baseUrl;
+    }
+
+    // AUTOMATIC PROXY: If site is HTTPS but server is HTTP, use /api/ proxy
+    const isPageHttps = window.location.protocol === 'https:';
+    const isServerHttp = baseUrl.startsWith('http://');
+
+    if (isPageHttps && isServerHttp) {
+      // Use proxy to avoid Mixed Content error
+      console.log('🔒 HTTPS detected - using /api/ proxy for HTTP server');
+      return `/api/${accessCode}/`;
     }
 
     // Build full URL
