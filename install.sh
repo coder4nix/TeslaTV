@@ -877,13 +877,34 @@ EOF
 
     echo -e "${BLUE}Tesla TV wurde vollständig entfernt.${NC}"
     echo ""
-    echo -e "${YELLOW}Hinweis:${NC} Installierte System-Pakete wurden behalten:"
+
+    # Frage nach System-Pakete Deinstallation
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}System-Pakete entfernen?${NC}"
+    echo ""
+    echo "Folgende Pakete sind noch installiert:"
     echo "  • Nginx"
     echo "  • Node.js"
     echo ""
-    echo "Um diese zu entfernen:"
-    echo "  apt remove --purge nginx nodejs"
-    echo "  apt autoremove"
+    echo -e "${YELLOW}⚠ Achtung:${NC} Diese Pakete könnten von anderen Anwendungen verwendet werden!"
+    echo ""
+    read -p "Möchten Sie Nginx und Node.js auch entfernen? (y/n) " -n 1 -r
+    echo ""
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo -e "${BLUE}🗑️  Entferne System-Pakete...${NC}"
+        apt remove --purge -y nginx nodejs 2>/dev/null || apt remove --purge -y nginx node 2>/dev/null
+        apt autoremove -y
+        echo -e "${GREEN}✓${NC} System-Pakete entfernt"
+    else
+        echo -e "${BLUE}ℹ${NC}  System-Pakete wurden behalten"
+        echo ""
+        echo "Um diese später zu entfernen:"
+        echo "  apt remove --purge nginx nodejs"
+        echo "  apt autoremove"
+    fi
     echo ""
 }
 
