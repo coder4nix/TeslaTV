@@ -138,13 +138,20 @@ export default function AdminArea() {
       baseUrl = 'http://' + baseUrl;
     }
 
-    // AUTOMATIC PROXY: If site is HTTPS but server is HTTP, use /api/ proxy
+    // AUTOMATIC PROXY: Use proxy for cross-origin requests or Mixed Content
     const isPageHttps = window.location.protocol === 'https:';
     const isServerHttp = baseUrl.startsWith('http://');
 
-    if (isPageHttps && isServerHttp) {
-      // Use proxy to avoid Mixed Content error
-      console.log('🔒 HTTPS detected - using /api/ proxy for HTTP server');
+    // Check if server is on different origin (domain/port)
+    const serverUrl = new URL(port ? `${baseUrl}:${port}` : baseUrl);
+    const currentOrigin = window.location.origin;
+    const serverOrigin = serverUrl.origin;
+    const isCrossOrigin = currentOrigin !== serverOrigin;
+
+    // Use proxy if: (1) HTTPS→HTTP (Mixed Content) OR (2) Cross-Origin (CORS)
+    if ((isPageHttps && isServerHttp) || isCrossOrigin) {
+      const reason = isPageHttps && isServerHttp ? 'Mixed Content' : 'CORS';
+      console.log(`🔒 ${reason} detected - using /api/ proxy for ${serverOrigin}`);
       return `/api/${accessCode}/`;
     }
 
