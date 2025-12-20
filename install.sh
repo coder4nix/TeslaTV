@@ -686,7 +686,7 @@ print_summary() {
     echo -e "${BLUE}🔄 Update Script:${NC} $APP_DIR/update.sh"
     echo ""
     echo -e "${BLUE}📝 Nützliche Befehle:${NC}"
-    echo -e "   ${YELLOW}Update App:${NC}          cd $APP_DIR && ./update.sh"
+    echo -e "   ${YELLOW}Update App:${NC}          $APP_DIR/update.sh"
     echo -e "   ${YELLOW}Deinstallieren:${NC}      ./install.sh --uninstall"
     echo -e "   ${YELLOW}Nginx Logs:${NC}          tail -f /var/log/nginx/tesla-tv-error.log"
     echo -e "   ${YELLOW}Nginx Neustart:${NC}      systemctl restart nginx"
