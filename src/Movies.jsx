@@ -20,12 +20,35 @@ export default function Movies({ userData }) {
     const serverSettings = localStorage.getItem('adminServerSettings');
     if (!serverSettings || !userData) return null;
 
-    const { serverUrl, port } = JSON.parse(serverSettings);
+    const { serverUrl, port, accessCode } = JSON.parse(serverSettings);
     const { username, password } = userData;
 
     let baseUrl = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;
+
+    // Support relative URLs (starting with /) for proxy setup
+    if (baseUrl.startsWith('/')) {
+      return `${baseUrl}/playlist/${username}/${password}/m3u_plus?output=hls`;
+    }
+
     if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
       baseUrl = 'http://' + baseUrl;
+    }
+
+    // AUTOMATIC PROXY: Use proxy for cross-origin requests or Mixed Content
+    const isPageHttps = window.location.protocol === 'https:';
+    const isServerHttp = baseUrl.startsWith('http://');
+
+    // Check if server is on different origin (domain/port)
+    const serverUrl_obj = new URL(port ? `${baseUrl}:${port}` : baseUrl);
+    const currentOrigin = window.location.origin;
+    const serverOrigin = serverUrl_obj.origin;
+    const isCrossOrigin = currentOrigin !== serverOrigin;
+
+    // Use proxy if: (1) HTTPS→HTTP (Mixed Content) OR (2) Cross-Origin (CORS)
+    if ((isPageHttps && isServerHttp) || isCrossOrigin) {
+      const reason = isPageHttps && isServerHttp ? 'Mixed Content' : 'CORS';
+      console.log(`🔒 [Movies] ${reason} detected - using /api/ proxy for ${serverOrigin}`);
+      return `/api/playlist/${username}/${password}/m3u_plus?output=hls`;
     }
 
     const fullUrl = port
