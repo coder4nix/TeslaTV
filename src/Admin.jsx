@@ -42,6 +42,13 @@ export default function Admin() {
     }
   }, [activeTab]);
 
+  // Auto-load users on component mount if settings exist
+  useEffect(() => {
+    if (serverSettings.serverUrl && serverSettings.accessCode && serverSettings.apiKey) {
+      loadUsersFromAPI();
+    }
+  }, [serverSettings.serverUrl, serverSettings.accessCode, serverSettings.apiKey]);
+
   // Build API URL - Format: {protocol}://{server}:{port}/{accessCode}/
   const buildApiUrl = () => {
     const { serverUrl, port, accessCode } = serverSettings;
