@@ -594,6 +594,10 @@ echo "🔄 Aktualisiere Tesla TV..."
 
 cd /var/www/tesla-tv
 
+# Verwerfe lokale Änderungen (falls vorhanden)
+echo "🧹 Bereinige lokale Änderungen..."
+git reset --hard HEAD
+
 # Pull neueste Änderungen
 echo "📥 Lade neueste Version..."
 git pull origin main 2>/dev/null || git pull origin master
