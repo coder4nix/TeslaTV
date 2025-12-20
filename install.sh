@@ -606,9 +606,17 @@ git pull origin main 2>/dev/null || git pull origin master
 echo "📦 Installiere Abhängigkeiten..."
 npm install
 
+# Fix vite permissions (wichtig für Build)
+if [ -d "node_modules/.bin" ]; then
+    chmod -R +x node_modules/.bin/ 2>/dev/null || true
+fi
+
 # Build
 echo "🔨 Baue Production Version..."
-npm run build
+if ! npm run build; then
+    echo "⚠ npm run build fehlgeschlagen, versuche npx..."
+    npx vite build
+fi
 
 # Setze Berechtigungen
 echo "🔐 Setze Berechtigungen..."
