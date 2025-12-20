@@ -107,13 +107,26 @@ export default function AdminArea() {
   };
 
   // Simple hash function for password storage
+  // Works in both HTTP and HTTPS contexts
   const hashPassword = async (password) => {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return hashHex;
+    // Check if crypto.subtle is available (HTTPS or localhost)
+    if (window.crypto && window.crypto.subtle) {
+      try {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(password);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return hashHex;
+      } catch (e) {
+        console.warn('crypto.subtle failed, using fallback hash');
+      }
+    }
+
+    // Fallback for HTTP (non-secure contexts)
+    // Simple hash using btoa - NOT cryptographically secure but works for local admin
+    console.warn('⚠️ Using insecure hash (HTTP context). Use HTTPS for production!');
+    return btoa(password).split('').reverse().join('') + password.length;
   };
 
   // Build API URL
