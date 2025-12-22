@@ -480,6 +480,48 @@ EOF
         proxy_buffering off;
         proxy_request_buffering off;
     }
+
+    # Stream Proxy für /play/ (HLS/M3U8 Streams)
+    location /play/ {
+        proxy_pass http://$IPTV_SERVER;
+        proxy_set_header Host $IPTV_SERVER;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # CORS Headers
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range" always;
+        add_header Access-Control-Expose-Headers "Content-Length,Content-Range" always;
+
+        # Streaming Optimizations
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_connect_timeout 10;
+        proxy_send_timeout 600;
+        proxy_read_timeout 600;
+        tcp_nodelay on;
+        tcp_nopush on;
+    }
+
+    # Images Proxy für /images/ (Logos, Poster, Cover)
+    location /images/ {
+        proxy_pass http://$IPTV_SERVER;
+        proxy_set_header Host $IPTV_SERVER;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # CORS Headers
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range" always;
+
+        # Cache Images (24 Stunden)
+        expires 24h;
+        add_header Cache-Control "public, max-age=86400";
+    }
 EOF
     fi
 

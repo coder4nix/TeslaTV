@@ -58,6 +58,59 @@ export default function Movies({ userData }) {
     return fullUrl;
   };
 
+  // Rewrite URLs to use proxy for CORS/Mixed Content
+  const rewriteUrlForProxy = (url) => {
+    if (!url) return url;
+
+    const serverSettings = localStorage.getItem('adminServerSettings');
+    if (!serverSettings) return url;
+
+    const { serverUrl, port } = JSON.parse(serverSettings);
+    let baseUrl = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;
+
+    // Support relative URLs - already using proxy
+    if (baseUrl.startsWith('/')) {
+      return url;
+    }
+
+    if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+      baseUrl = 'http://' + baseUrl;
+    }
+
+    // Check if we need proxy
+    const isPageHttps = window.location.protocol === 'https:';
+    const isServerHttp = baseUrl.startsWith('http://');
+    const serverUrlObj = new URL(port ? `${baseUrl}:${port}` : baseUrl);
+    const currentOrigin = window.location.origin;
+    const serverOrigin = serverUrlObj.origin;
+    const isCrossOrigin = currentOrigin !== serverOrigin;
+
+    // If proxy is needed, rewrite URLs
+    if ((isPageHttps && isServerHttp) || isCrossOrigin) {
+      try {
+        const urlObj = new URL(url);
+
+        // Rewrite /play/ URLs
+        if (urlObj.pathname.startsWith('/play/')) {
+          const rewrittenUrl = url.replace(urlObj.origin, '');
+          console.log(`🔄 [Movies] Rewriting stream URL: ${url} → ${rewrittenUrl}`);
+          return rewrittenUrl;
+        }
+
+        // Rewrite /images/ URLs
+        if (urlObj.pathname.startsWith('/images/')) {
+          const rewrittenUrl = url.replace(urlObj.origin, '');
+          console.log(`🔄 [Movies] Rewriting image URL: ${url} → ${rewrittenUrl}`);
+          return rewrittenUrl;
+        }
+      } catch (e) {
+        console.error('Error rewriting URL:', e);
+      }
+    }
+
+    return url;
+  };
+
   // Parse M3U Playlist
   const parseM3U = (m3uText) => {
     const lines = m3uText.split('\n');
@@ -80,7 +133,10 @@ export default function Movies({ userData }) {
         if (tvgNameMatch) currentItem.tvg_name = tvgNameMatch[1];
 
         const tvgLogoMatch = line.match(/tvg-logo="([^"]*)"/);
-        if (tvgLogoMatch) currentItem.tvg_logo = tvgLogoMatch[1];
+        if (tvgLogoMatch) {
+          const originalLogo = tvgLogoMatch[1];
+          currentItem.tvg_logo = rewriteUrlForProxy(originalLogo);
+        }
 
         const groupTitleMatch = line.match(/group-title="([^"]+)"/);
         if (groupTitleMatch) currentItem.group_title = groupTitleMatch[1];
@@ -89,7 +145,7 @@ export default function Movies({ userData }) {
         if (nameMatch) currentItem.name = nameMatch[1].trim();
 
       } else if (line && !line.startsWith('#') && currentItem) {
-        currentItem.url = line;
+        currentItem.url = rewriteUrlForProxy(line);
         items.push(currentItem);
         currentItem = null;
       }
