@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useLanguage } from './contexts/LanguageContext';
+import VideoPlayer from './components/VideoPlayer';
 
 export default function Series({ userData }) {
   const { t } = useLanguage();
@@ -10,6 +11,14 @@ export default function Series({ userData }) {
   const [series, setSeries] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Multi-view states
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'seasons' | 'episodes'
+  const [selectedSeries, setSelectedSeries] = useState(null);
+  const [selectedSeason, setSelectedSeason] = useState(null);
+  const [seriesDetails, setSeriesDetails] = useState(null);
+  const [currentEpisode, setCurrentEpisode] = useState(null);
+  const [player, setPlayer] = useState(null);
 
   // Build API URL
   const buildApiUrl = () => {
@@ -104,6 +113,52 @@ export default function Series({ userData }) {
     }
 
     return url;
+  };
+
+  // Load series details (seasons and episodes)
+  const loadSeriesDetails = async (seriesId) => {
+    try {
+      const apiUrl = buildApiUrl();
+      if (!apiUrl) return;
+
+      const serverSettings = JSON.parse(localStorage.getItem('adminServerSettings'));
+
+      const response = await axios.get(apiUrl, {
+        params: {
+          api_key: serverSettings.apiKey,
+          action: 'get_series_info',
+          series_id: seriesId
+        },
+        timeout: 10000
+      });
+
+      if (response.data && response.data.status === 'STATUS_SUCCESS') {
+        const details = response.data.data;
+
+        // Process episodes and rewrite cover/backdrop URLs
+        if (details.episodes) {
+          Object.keys(details.episodes).forEach(seasonNum => {
+            details.episodes[seasonNum] = details.episodes[seasonNum].map(episode => ({
+              ...episode,
+              info: {
+                ...episode.info,
+                movie_image: episode.info?.movie_image ? rewriteUrlForProxy(episode.info.movie_image) : null
+              }
+            }));
+          });
+        }
+
+        // Rewrite info cover/backdrop
+        if (details.info) {
+          details.info.cover = details.info.cover ? rewriteUrlForProxy(details.info.cover) : null;
+          details.info.backdrop_path = details.info.backdrop_path ? rewriteUrlForProxy(details.info.backdrop_path) : null;
+        }
+
+        setSeriesDetails(details);
+      }
+    } catch (error) {
+      console.error('Error loading series details:', error);
+    }
   };
 
   // Load categories and series from API
@@ -252,25 +307,59 @@ export default function Series({ userData }) {
 
       {/* Series Content */}
       <div className="flex-1 bg-slate-900/50 backdrop-blur-sm rounded-xl border border-slate-800/30 overflow-hidden flex flex-col">
-        {/* Search Header */}
+        {/* Header with Back Button */}
         <div className="p-4 border-b border-slate-800/50">
-          <div className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t.series.searchPlaceholder}
-              className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 pl-12 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-transparent transition-all"
-            />
-            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
+          {viewMode !== 'grid' && (
+            <button
+              onClick={() => {
+                if (viewMode === 'episodes') {
+                  setViewMode('seasons');
+                  setSelectedSeason(null);
+                } else if (viewMode === 'seasons') {
+                  setViewMode('grid');
+                  setSelectedSeries(null);
+                  setSeriesDetails(null);
+                }
+              }}
+              className="mb-3 flex items-center text-slate-400 hover:text-white transition-colors"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              {viewMode === 'episodes' ? 'Back to Seasons' : 'Back to Series'}
+            </button>
+          )}
+
+          {viewMode === 'grid' ? (
+            <div className="relative">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t.series.searchPlaceholder}
+                className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 pl-12 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-transparent transition-all"
+              />
+              <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          ) : viewMode === 'seasons' && selectedSeries ? (
+            <div>
+              <h2 className="text-2xl font-bold text-white">{selectedSeries.name}</h2>
+              {seriesDetails?.info?.plot && (
+                <p className="text-sm text-slate-400 mt-2 line-clamp-2">{seriesDetails.info.plot}</p>
+              )}
+            </div>
+          ) : viewMode === 'episodes' && selectedSeason ? (
+            <div>
+              <h2 className="text-2xl font-bold text-white">{selectedSeries?.name} - Season {selectedSeason}</h2>
+            </div>
+          ) : null}
         </div>
 
-        {/* Series Grid */}
+        {/* Content Area */}
         <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-          {filteredSeries.length === 0 ? (
+          {viewMode === 'grid' && (filteredSeries.length === 0 ? (
             <div className="text-center py-20 text-slate-500">
               <svg className="w-20 h-20 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -282,6 +371,11 @@ export default function Series({ userData }) {
               {filteredSeries.map((show) => (
                 <div
                   key={show.series_id}
+                  onClick={async () => {
+                    setSelectedSeries(show);
+                    await loadSeriesDetails(show.series_id);
+                    setViewMode('seasons');
+                  }}
                   className="group relative bg-slate-900/50 backdrop-blur-sm rounded-xl overflow-hidden border border-slate-800/30 hover:border-red-500/50 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-red-500/10 cursor-pointer"
                 >
                   {/* Poster */}
@@ -333,16 +427,139 @@ export default function Series({ userData }) {
                 </div>
               ))}
             </div>
+          ))}
+
+          {/* Seasons View */}
+          {viewMode === 'seasons' && seriesDetails && seriesDetails.episodes && (
+            <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {Object.keys(seriesDetails.episodes).sort((a, b) => parseInt(a) - parseInt(b)).map(seasonNum => (
+                <div
+                  key={seasonNum}
+                  onClick={() => {
+                    setSelectedSeason(seasonNum);
+                    setViewMode('episodes');
+                  }}
+                  className="group relative bg-slate-900/50 backdrop-blur-sm rounded-xl overflow-hidden border border-slate-800/30 hover:border-red-500/50 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-red-500/10 cursor-pointer p-6"
+                >
+                  <div className="text-center">
+                    <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-red-500 to-orange-500 rounded-full flex items-center justify-center">
+                      <span className="text-3xl font-bold text-white">{seasonNum}</span>
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-2">Season {seasonNum}</h3>
+                    <p className="text-sm text-slate-400">{seriesDetails.episodes[seasonNum].length} Episodes</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Episodes View */}
+          {viewMode === 'episodes' && selectedSeason && seriesDetails?.episodes?.[selectedSeason] && (
+            <div className="p-4 space-y-3">
+              {seriesDetails.episodes[selectedSeason].map((episode, index) => {
+                const serverSettings = JSON.parse(localStorage.getItem('adminServerSettings') || '{}');
+                const { username, password } = userData || {};
+                const episodeUrl = rewriteUrlForProxy(
+                  `${serverSettings.serverUrl}:${serverSettings.port || 80}/series/${username}/${password}/${episode.id}.${episode.container_extension || 'mkv'}`
+                );
+
+                return (
+                  <div
+                    key={episode.id || index}
+                    onClick={() => setCurrentEpisode({...episode, url: episodeUrl})}
+                    className="group bg-slate-900/50 backdrop-blur-sm rounded-xl border border-slate-800/30 hover:border-red-500/50 transition-all duration-300 hover:shadow-lg cursor-pointer overflow-hidden"
+                  >
+                    <div className="flex gap-4 p-4">
+                      {/* Episode Thumbnail */}
+                      <div className="flex-shrink-0 w-40 h-24 bg-gradient-to-br from-slate-800 to-slate-900 rounded-lg overflow-hidden relative">
+                        {episode.info?.movie_image ? (
+                          <img
+                            src={episode.info.movie_image}
+                            alt={episode.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <svg className="w-12 h-12 text-slate-700" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M8 5v14l11-7z"/>
+                            </svg>
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 to-orange-600/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                      </div>
+
+                      {/* Episode Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <span className="text-xs font-semibold text-red-400">Episode {episode.episode_num}</span>
+                            <h4 className="text-base font-semibold text-white group-hover:text-red-400 transition-colors truncate">
+                              {episode.title}
+                            </h4>
+                          </div>
+                          {episode.info?.duration && (
+                            <span className="text-xs text-slate-500 ml-2">{episode.info.duration}</span>
+                          )}
+                        </div>
+                        {episode.info?.plot && (
+                          <p className="text-sm text-slate-400 line-clamp-2">{episode.info.plot}</p>
+                        )}
+                        {episode.info?.rating && (
+                          <div className="mt-2 flex items-center text-xs text-slate-500">
+                            <span>⭐ {episode.info.rating}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
 
         {/* Footer Info */}
-        <div className="p-3 border-t border-slate-800/50 bg-slate-900/30">
-          <p className="text-xs text-slate-500 text-center">
-            {filteredSeries.length} {t.series.seriesShowing}
-          </p>
-        </div>
+        {viewMode === 'grid' && (
+          <div className="p-3 border-t border-slate-800/50 bg-slate-900/30">
+            <p className="text-xs text-slate-500 text-center">
+              {filteredSeries.length} {t.series.seriesShowing}
+            </p>
+          </div>
+        )}
       </div>
+
+      {/* Video Player for Episodes */}
+      {currentEpisode && (
+        <div className="flex-1 bg-slate-900/50 backdrop-blur-sm rounded-xl border border-slate-800/30 overflow-hidden flex flex-col">
+          {/* Player Header */}
+          <div className="p-4 border-b border-slate-800/50 flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-lg font-bold text-white truncate">{currentEpisode.title}</h3>
+              <p className="text-sm text-slate-400">
+                {selectedSeries?.name} - Season {selectedSeason} Episode {currentEpisode.episode_num}
+              </p>
+            </div>
+            <button
+              onClick={() => setCurrentEpisode(null)}
+              className="ml-4 p-2 hover:bg-slate-800/50 rounded-lg transition-colors"
+            >
+              <svg className="w-6 h-6 text-slate-400 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Video Player */}
+          <div className="flex-1 bg-black flex items-center justify-center">
+            <VideoPlayer
+              src={currentEpisode.url}
+              poster={currentEpisode.info?.movie_image}
+              autoplay={true}
+              onReady={(playerInstance) => setPlayer(playerInstance)}
+            />
+          </div>
+        </div>
+      )}
 
       <style>{`
         .scrollbar-thin::-webkit-scrollbar {
