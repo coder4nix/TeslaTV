@@ -192,12 +192,17 @@ export default function Series({ userData }) {
           timeout: 10000
         });
 
+        console.log('[Series] Categories Response:', categoriesResponse.data);
+
         if (categoriesResponse.data && categoriesResponse.data.status === 'STATUS_SUCCESS') {
           const cats = categoriesResponse.data.data || [];
+          console.log('[Series] Categories loaded:', cats.length);
           setCategories([
             { category_id: null, category_name: t.series.allSeries, parent_id: 0 },
             ...cats
           ]);
+        } else {
+          console.error('[Series] Categories failed:', categoriesResponse.data);
         }
 
         // Load series
@@ -209,14 +214,19 @@ export default function Series({ userData }) {
           timeout: 10000
         });
 
+        console.log('[Series] Series Response:', seriesResponse.data);
+
         if (seriesResponse.data && seriesResponse.data.status === 'STATUS_SUCCESS') {
           const seriesData = seriesResponse.data.data || [];
+          console.log('[Series] Series loaded:', seriesData.length);
           // Rewrite cover image URLs to use proxy
           const seriesWithRewrittenUrls = seriesData.map(show => ({
             ...show,
             cover: show.cover ? rewriteUrlForProxy(show.cover) : show.cover
           }));
           setSeries(seriesWithRewrittenUrls);
+        } else {
+          console.error('[Series] Series failed:', seriesResponse.data);
         }
 
       } catch (error) {

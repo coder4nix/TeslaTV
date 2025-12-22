@@ -12,7 +12,6 @@ export default function LiveTV({ userData }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentStream, setCurrentStream] = useState(null);
-  const [currentBitrate, setCurrentBitrate] = useState(null);
   const [player, setPlayer] = useState(null);
 
   // Build M3U Playlist URL
@@ -161,100 +160,6 @@ export default function LiveTV({ userData }) {
 
     return channels;
   };
-
-  // Fetch actual bitrate from M3U8 manifest
-  useEffect(() => {
-    if (!currentStream || !currentStream.url) return;
-
-    const fetchBitrate = async () => {
-      try {
-        console.log('Fetching M3U8 manifest to get actual bitrate...');
-
-        // Fetch the M3U8 manifest
-        const response = await axios.get(currentStream.url, {
-          responseType: 'text',
-          timeout: 5000
-        });
-
-        const manifest = response.data;
-        console.log('M3U8 manifest received');
-
-        // Parse the manifest for BANDWIDTH
-        const lines = manifest.split('\n');
-        let bandwidth = null;
-
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].trim();
-
-          // Look for #EXT-X-STREAM-INF with BANDWIDTH
-          if (line.startsWith('#EXT-X-STREAM-INF')) {
-            const bandwidthMatch = line.match(/BANDWIDTH=(\d+)/);
-            if (bandwidthMatch) {
-              bandwidth = parseInt(bandwidthMatch[1]);
-              console.log('Found BANDWIDTH in manifest:', bandwidth);
-              break;
-            }
-          }
-
-          // Also check for AVERAGE-BANDWIDTH
-          if (line.startsWith('#EXT-X-STREAM-INF') && line.includes('AVERAGE-BANDWIDTH')) {
-            const avgBandwidthMatch = line.match(/AVERAGE-BANDWIDTH=(\d+)/);
-            if (avgBandwidthMatch && !bandwidth) {
-              bandwidth = parseInt(avgBandwidthMatch[1]);
-              console.log('Found AVERAGE-BANDWIDTH in manifest:', bandwidth);
-              break;
-            }
-          }
-        }
-
-        if (bandwidth) {
-          const mbps = (bandwidth / 1000000).toFixed(2);
-          setCurrentBitrate(`${mbps} Mbps`);
-          console.log(`✓ Actual bitrate from M3U8: ${mbps} Mbps`);
-        } else {
-          // Fallback to resolution-based estimation
-          console.log('No BANDWIDTH found in manifest, using resolution estimation');
-          estimateBitrateFromResolution();
-        }
-      } catch (error) {
-        console.log('Error fetching M3U8 manifest:', error.message);
-        // Fallback to resolution-based estimation
-        estimateBitrateFromResolution();
-      }
-    };
-
-    // Fallback function to estimate from video resolution
-    const estimateBitrateFromResolution = () => {
-      if (!player) return;
-
-      setTimeout(() => {
-        const videoElement = player.el().querySelector('video');
-        if (videoElement) {
-          const width = videoElement.videoWidth;
-          const height = videoElement.videoHeight;
-
-          if (width > 0 && height > 0) {
-            let estimatedBitrate;
-            if (height >= 1080) {
-              estimatedBitrate = 5.0;
-            } else if (height >= 720) {
-              estimatedBitrate = 3.0;
-            } else if (height >= 480) {
-              estimatedBitrate = 1.5;
-            } else {
-              estimatedBitrate = 0.8;
-            }
-            setCurrentBitrate(`~${estimatedBitrate} Mbps`);
-            console.log(`Estimated bitrate from resolution: ${estimatedBitrate} Mbps (${width}x${height})`);
-          }
-        }
-      }, 2000);
-    };
-
-    // Fetch bitrate when stream starts
-    fetchBitrate();
-
-  }, [currentStream, player]);
 
   // Load M3U Playlist
   useEffect(() => {
@@ -556,17 +461,6 @@ export default function LiveTV({ userData }) {
                   <div>
                     <p className="text-xs text-slate-500 mb-1">{t.liveTV.channelId}</p>
                     <p className="text-sm text-white font-mono">{currentStream.xui_id || currentStream.tvg_id || 'N/A'}</p>
-                  </div>
-
-                  {/* Bitrate */}
-                  <div>
-                    <p className="text-xs text-slate-500 mb-1">{t.liveTV.bitrate}</p>
-                    <p className="text-sm text-white font-mono flex items-center gap-2">
-                      {currentBitrate || t.liveTV.detecting}
-                      {currentBitrate && (
-                        <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                      )}
-                    </p>
                   </div>
 
                   {/* EPG */}

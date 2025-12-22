@@ -141,12 +141,17 @@ export default function Movies({ userData }) {
           timeout: 10000
         });
 
+        console.log('[Movies] VOD Categories Response:', categoriesResponse.data);
+
         if (categoriesResponse.data && categoriesResponse.data.status === 'STATUS_SUCCESS') {
           const cats = categoriesResponse.data.data || [];
+          console.log('[Movies] VOD Categories loaded:', cats.length);
           setCategories([
             { category_id: null, category_name: t.movies.allMovies, parent_id: 0 },
             ...cats
           ]);
+        } else {
+          console.error('[Movies] VOD Categories failed:', categoriesResponse.data);
         }
 
         // Load VOD streams
@@ -158,8 +163,11 @@ export default function Movies({ userData }) {
           timeout: 10000
         });
 
+        console.log('[Movies] VOD Streams Response:', vodResponse.data);
+
         if (vodResponse.data && vodResponse.data.status === 'STATUS_SUCCESS') {
           const vodData = vodResponse.data.data || [];
+          console.log('[Movies] VOD Streams loaded:', vodData.length);
           // Rewrite stream and cover URLs to use proxy
           const vodWithRewrittenUrls = vodData.map(movie => ({
             ...movie,
@@ -167,6 +175,8 @@ export default function Movies({ userData }) {
             container_extension: movie.container_extension || 'mp4'
           }));
           setMovies(vodWithRewrittenUrls);
+        } else {
+          console.error('[Movies] VOD Streams failed:', vodResponse.data);
         }
 
       } catch (error) {
