@@ -92,14 +92,14 @@ export default function LiveTV({ userData }) {
 
         // Rewrite /play/ URLs
         if (urlObj.pathname.startsWith('/play/')) {
-          const rewrittenUrl = url.replace(urlObj.origin, '');
+          const rewrittenUrl = urlObj.pathname + urlObj.search + urlObj.hash;
           console.log(`🔄 [LiveTV] Rewriting stream URL: ${url} → ${rewrittenUrl}`);
           return rewrittenUrl;
         }
 
         // Rewrite /images/ URLs
         if (urlObj.pathname.startsWith('/images/')) {
-          const rewrittenUrl = url.replace(urlObj.origin, '');
+          const rewrittenUrl = urlObj.pathname + urlObj.search + urlObj.hash;
           console.log(`🔄 [LiveTV] Rewriting image URL: ${url} → ${rewrittenUrl}`);
           return rewrittenUrl;
         }

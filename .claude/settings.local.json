@@ -8,7 +8,10 @@
       "Bash(git add:*)",
       "Bash(npm run build:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git config:*)",
+      "WebFetch(domain:tesla-tv.com)",
+      "WebFetch(domain:144.76.200.209)"
     ]
   }
 }

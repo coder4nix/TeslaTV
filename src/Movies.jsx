@@ -15,19 +15,22 @@ export default function Movies({ userData }) {
   const [player, setPlayer] = useState(null);
   const [shouldAutoFullscreen, setShouldAutoFullscreen] = useState(false);
 
-  // Build M3U Playlist URL
-  const buildPlaylistUrl = () => {
+  // Build API URL
+  const buildApiUrl = () => {
     const serverSettings = localStorage.getItem('adminServerSettings');
     if (!serverSettings || !userData) return null;
 
     const { serverUrl, port, accessCode } = JSON.parse(serverSettings);
-    const { username, password } = userData;
+
+    if (import.meta.env.DEV) {
+      return `/api/${accessCode}/`;
+    }
 
     let baseUrl = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;
 
     // Support relative URLs (starting with /) for proxy setup
     if (baseUrl.startsWith('/')) {
-      return `${baseUrl}/playlist/${username}/${password}/m3u_plus?output=hls`;
+      return `${baseUrl}/${accessCode}/`;
     }
 
     if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
@@ -39,23 +42,19 @@ export default function Movies({ userData }) {
     const isServerHttp = baseUrl.startsWith('http://');
 
     // Check if server is on different origin (domain/port)
-    const serverUrl_obj = new URL(port ? `${baseUrl}:${port}` : baseUrl);
+    const serverUrlObj = new URL(port ? `${baseUrl}:${port}` : baseUrl);
     const currentOrigin = window.location.origin;
-    const serverOrigin = serverUrl_obj.origin;
+    const serverOrigin = serverUrlObj.origin;
     const isCrossOrigin = currentOrigin !== serverOrigin;
 
     // Use proxy if: (1) HTTPS→HTTP (Mixed Content) OR (2) Cross-Origin (CORS)
     if ((isPageHttps && isServerHttp) || isCrossOrigin) {
       const reason = isPageHttps && isServerHttp ? 'Mixed Content' : 'CORS';
       console.log(`🔒 [Movies] ${reason} detected - using /api/ proxy for ${serverOrigin}`);
-      return `/api/playlist/${username}/${password}/m3u_plus?output=hls`;
+      return `/api/${accessCode}/`;
     }
 
-    const fullUrl = port
-      ? `${baseUrl}:${port}/playlist/${username}/${password}/m3u_plus?output=hls`
-      : `${baseUrl}/playlist/${username}/${password}/m3u_plus?output=hls`;
-
-    return fullUrl;
+    return port ? `${baseUrl}:${port}/${accessCode}/` : `${baseUrl}/${accessCode}/`;
   };
 
   // Rewrite URLs to use proxy for CORS/Mixed Content
@@ -92,14 +91,14 @@ export default function Movies({ userData }) {
 
         // Rewrite /play/ URLs
         if (urlObj.pathname.startsWith('/play/')) {
-          const rewrittenUrl = url.replace(urlObj.origin, '');
+          const rewrittenUrl = urlObj.pathname + urlObj.search + urlObj.hash;
           console.log(`🔄 [Movies] Rewriting stream URL: ${url} → ${rewrittenUrl}`);
           return rewrittenUrl;
         }
 
         // Rewrite /images/ URLs
         if (urlObj.pathname.startsWith('/images/')) {
-          const rewrittenUrl = url.replace(urlObj.origin, '');
+          const rewrittenUrl = urlObj.pathname + urlObj.search + urlObj.hash;
           console.log(`🔄 [Movies] Rewriting image URL: ${url} → ${rewrittenUrl}`);
           return rewrittenUrl;
         }
@@ -111,52 +110,9 @@ export default function Movies({ userData }) {
     return url;
   };
 
-  // Parse M3U Playlist
-  const parseM3U = (m3uText) => {
-    const lines = m3uText.split('\n');
-    const items = [];
-    let currentItem = null;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-
-      if (line.startsWith('#EXTINF:')) {
-        currentItem = {};
-
-        const xuiIdMatch = line.match(/xui-id="([^"]+)"/);
-        if (xuiIdMatch) currentItem.xui_id = xuiIdMatch[1];
-
-        const tvgIdMatch = line.match(/tvg-id="([^"]*)"/);
-        if (tvgIdMatch) currentItem.tvg_id = tvgIdMatch[1];
-
-        const tvgNameMatch = line.match(/tvg-name="([^"]+)"/);
-        if (tvgNameMatch) currentItem.tvg_name = tvgNameMatch[1];
-
-        const tvgLogoMatch = line.match(/tvg-logo="([^"]*)"/);
-        if (tvgLogoMatch) {
-          const originalLogo = tvgLogoMatch[1];
-          currentItem.tvg_logo = rewriteUrlForProxy(originalLogo);
-        }
-
-        const groupTitleMatch = line.match(/group-title="([^"]+)"/);
-        if (groupTitleMatch) currentItem.group_title = groupTitleMatch[1];
-
-        const nameMatch = line.match(/,(.+)$/);
-        if (nameMatch) currentItem.name = nameMatch[1].trim();
-
-      } else if (line && !line.startsWith('#') && currentItem) {
-        currentItem.url = rewriteUrlForProxy(line);
-        items.push(currentItem);
-        currentItem = null;
-      }
-    }
-
-    return items;
-  };
-
-  // Load M3U Playlist
+  // Load categories and movies from API
   useEffect(() => {
-    const loadPlaylist = async () => {
+    const loadData = async () => {
       if (!userData) {
         setError('No user data available');
         setIsLoading(false);
@@ -167,59 +123,61 @@ export default function Movies({ userData }) {
       setError(null);
 
       try {
-        const playlistUrl = buildPlaylistUrl();
-        if (!playlistUrl) {
+        const apiUrl = buildApiUrl();
+        if (!apiUrl) {
           setError('Server nicht konfiguriert');
           setIsLoading(false);
           return;
         }
 
-        // Load M3U playlist
-        const response = await axios.get(playlistUrl, {
-          timeout: 15000,
-          responseType: 'text'
+        const serverSettings = JSON.parse(localStorage.getItem('adminServerSettings'));
+
+        // Load VOD categories
+        const categoriesResponse = await axios.get(apiUrl, {
+          params: {
+            api_key: serverSettings.apiKey,
+            action: 'get_vod_categories'
+          },
+          timeout: 10000
         });
 
-        // Parse M3U
-        const allItems = parseM3U(response.data);
+        if (categoriesResponse.data && categoriesResponse.data.status === 'STATUS_SUCCESS') {
+          const cats = categoriesResponse.data.data || [];
+          setCategories([
+            { category_id: null, category_name: t.movies.allMovies, parent_id: 0 },
+            ...cats
+          ]);
+        }
 
-        // Filter for movies (VOD items - URLs ending with video extensions)
-        const movieItems = allItems.filter(item => {
-          const url = item.url.toLowerCase();
-          return url.includes('.mp4') || url.includes('.mkv') || url.includes('.avi') ||
-                 url.includes('.mov') || url.includes('.flv') || url.includes('.wmv');
+        // Load VOD streams
+        const vodResponse = await axios.get(apiUrl, {
+          params: {
+            api_key: serverSettings.apiKey,
+            action: 'get_vod_streams'
+          },
+          timeout: 10000
         });
 
-        // Extract unique categories from movies
-        const categoryMap = new Map();
-        movieItems.forEach(movie => {
-          if (movie.group_title && !categoryMap.has(movie.group_title)) {
-            categoryMap.set(movie.group_title, {
-              category_id: movie.group_title,
-              category_name: movie.group_title
-            });
-          }
-        });
-
-        const categoriesList = Array.from(categoryMap.values());
-
-        // Add "All Movies" at the beginning
-        setCategories([
-          { category_id: null, category_name: t.movies.allMovies },
-          ...categoriesList
-        ]);
-
-        setMovies(movieItems);
+        if (vodResponse.data && vodResponse.data.status === 'STATUS_SUCCESS') {
+          const vodData = vodResponse.data.data || [];
+          // Rewrite stream and cover URLs to use proxy
+          const vodWithRewrittenUrls = vodData.map(movie => ({
+            ...movie,
+            stream_icon: movie.stream_icon ? rewriteUrlForProxy(movie.stream_icon) : movie.stream_icon,
+            container_extension: movie.container_extension || 'mp4'
+          }));
+          setMovies(vodWithRewrittenUrls);
+        }
 
       } catch (error) {
-        console.error('Error loading M3U playlist:', error);
-        setError(error.message || 'Failed to load playlist');
+        console.error('Error loading VOD data:', error);
+        setError(error.message);
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadPlaylist();
+    loadData();
   }, [userData, t]);
 
   // Auto fullscreen when player is ready
@@ -297,16 +255,15 @@ export default function Movies({ userData }) {
 
   // Filter movies by category and search query
   const filteredMovies = movies.filter(movie => {
-    const matchesSearch = movie.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         movie.tvg_name?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === null || movie.group_title === selectedCategory;
+    const matchesSearch = movie.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === null || movie.category_id === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
   // Count movies per category
   const getCategoryCount = (categoryId) => {
     if (categoryId === null) return movies.length;
-    return movies.filter(m => m.group_title === categoryId).length;
+    return movies.filter(m => m.category_id === categoryId).length;
   };
 
   if (isLoading) {
@@ -400,47 +357,56 @@ export default function Movies({ userData }) {
             </div>
           ) : (
             <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {filteredMovies.map((movie, index) => (
-                <div
-                  key={movie.xui_id || index}
-                  onClick={() => {
-                    setCurrentMovie(movie);
-                    setShouldAutoFullscreen(true);
-                  }}
-                  className="group relative bg-slate-900/50 backdrop-blur-sm rounded-xl overflow-hidden border border-slate-800/30 hover:border-red-500/50 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-red-500/10 cursor-pointer"
-                >
-                  {/* Poster */}
-                  <div className="aspect-[2/3] bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center relative overflow-hidden">
-                    {movie.tvg_logo ? (
-                      <img
-                        src={movie.tvg_logo}
-                        alt={movie.name || movie.tvg_name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.style.display = 'none';
-                          e.target.nextElementSibling.style.display = 'flex';
-                        }}
-                      />
-                    ) : null}
-                    <div className={movie.tvg_logo ? 'hidden absolute inset-0 bg-gradient-to-br from-red-500/20 to-orange-600/20 flex items-center justify-center' : 'absolute inset-0 bg-gradient-to-br from-red-500/20 to-orange-600/20 flex items-center justify-center'}>
-                      <svg className="w-16 h-16 text-slate-700 group-hover:text-red-500 transition-colors" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z"/>
-                      </svg>
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 to-orange-600/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                  </div>
+              {filteredMovies.map((movie, index) => {
+                // Build stream URL from stream_id and container_extension
+                const serverSettings = JSON.parse(localStorage.getItem('adminServerSettings') || '{}');
+                const { username, password } = userData || {};
+                const streamUrl = rewriteUrlForProxy(
+                  `${serverSettings.serverUrl}:${serverSettings.port || 80}/movie/${username}/${password}/${movie.stream_id}.${movie.container_extension}`
+                );
 
-                  {/* Info */}
-                  <div className="p-3">
-                    <h3 className="font-semibold text-sm mb-1 truncate group-hover:text-red-400 transition-colors">
-                      {movie.name || movie.tvg_name}
-                    </h3>
-                    <p className="text-xs text-slate-600 mt-1 truncate">
-                      {movie.group_title || ''}
-                    </p>
+                return (
+                  <div
+                    key={movie.stream_id || index}
+                    onClick={() => {
+                      setCurrentMovie({...movie, url: streamUrl});
+                      setShouldAutoFullscreen(true);
+                    }}
+                    className="group relative bg-slate-900/50 backdrop-blur-sm rounded-xl overflow-hidden border border-slate-800/30 hover:border-red-500/50 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-red-500/10 cursor-pointer"
+                  >
+                    {/* Poster */}
+                    <div className="aspect-[2/3] bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center relative overflow-hidden">
+                      {movie.stream_icon ? (
+                        <img
+                          src={movie.stream_icon}
+                          alt={movie.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextElementSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div className={movie.stream_icon ? 'hidden absolute inset-0 bg-gradient-to-br from-red-500/20 to-orange-600/20 flex items-center justify-center' : 'absolute inset-0 bg-gradient-to-br from-red-500/20 to-orange-600/20 flex items-center justify-center'}>
+                        <svg className="w-16 h-16 text-slate-700 group-hover:text-red-500 transition-colors" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M8 5v14l11-7z"/>
+                        </svg>
+                      </div>
+                      <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 to-orange-600/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    </div>
+
+                    {/* Info */}
+                    <div className="p-3">
+                      <h3 className="font-semibold text-sm mb-1 truncate group-hover:text-red-400 transition-colors">
+                        {movie.name}
+                      </h3>
+                      <p className="text-xs text-slate-600 mt-1 truncate">
+                        {categories.find(c => c.category_id === movie.category_id)?.category_name || ''}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -458,7 +424,7 @@ export default function Movies({ userData }) {
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 99999 }}>
           <VideoPlayer
             src={currentMovie.url}
-            poster={currentMovie.tvg_logo}
+            poster={currentMovie.stream_icon}
             autoplay={true}
             onReady={(playerInstance) => {
               setPlayer(playerInstance);

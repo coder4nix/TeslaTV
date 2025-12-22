@@ -87,14 +87,14 @@ export default function Series({ userData }) {
 
         // Rewrite /images/ URLs
         if (urlObj.pathname.startsWith('/images/')) {
-          const rewrittenUrl = url.replace(urlObj.origin, '');
+          const rewrittenUrl = urlObj.pathname + urlObj.search + urlObj.hash;
           console.log(`🔄 [Series] Rewriting image URL: ${url} → ${rewrittenUrl}`);
           return rewrittenUrl;
         }
 
         // Rewrite /play/ URLs (for episodes)
         if (urlObj.pathname.startsWith('/play/')) {
-          const rewrittenUrl = url.replace(urlObj.origin, '');
+          const rewrittenUrl = urlObj.pathname + urlObj.search + urlObj.hash;
           console.log(`🔄 [Series] Rewriting stream URL: ${url} → ${rewrittenUrl}`);
           return rewrittenUrl;
         }
