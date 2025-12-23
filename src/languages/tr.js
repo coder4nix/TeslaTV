@@ -13,14 +13,17 @@ export default {
     expiryDate: 'Bitiş Tarihi',
     unlimited: 'Sınırsız',
     statusActive: 'Aktif',
-    statusInactive: 'Pasif'
+    statusInactive: 'Pasif',
+    searchPlaceholder: 'Film, dizi, program, aktör ara'
   },
 
   // Navigation
   nav: {
     liveTV: 'Canlı TV',
     movies: 'Filmler',
-    series: 'Diziler'
+    series: 'Diziler',
+    allMovies: 'Tüm Filmler',
+    allSeries: 'Tüm Diziler'
   },
 
   // Login
@@ -48,6 +51,8 @@ export default {
     searchPlaceholder: 'Kanal ara...',
     noResults: 'Sonuç bulunamadı',
     live: 'CANLI',
+    watchNow: 'Hemen İzle',
+    currentlyPopular: 'Şuan En Popüler',
     channelsShowing: 'kanal gösteriliyor',
     streamInfo: 'Yayın Bilgileri',
     channelId: 'Kanal ID',
@@ -95,6 +100,15 @@ export default {
     seriesShowing: 'dizi gösteriliyor',
     season: 'Sezon',
     episode: 'Bölüm',
+    startWatching: 'İzlemeye Başla',
+    like: 'Beğen',
+    dislike: 'Beğenme',
+    addToWatchlist: 'İzleme Listesine Ekle',
+    share: 'Paylaş',
+    episodes: 'Bölümler',
+    similarContent: 'Benzer İçerikler',
+    cast: 'Kadro',
+    extras: 'Ekstralar',
     categoryAction: 'Aksiyon',
     categoryComedy: 'Komedi',
     categoryDrama: 'Dram',
@@ -165,7 +179,112 @@ export default {
       serverSettings: 'Server-Einstellungen',
       userLines: 'Benutzer-Lines',
       settings: 'Einstellungen'
+    },
+    tmdb: {
+      title: 'TMDB Integration',
+      subtitle: 'The Movie Database (TMDB) ile yüksek kaliteli görseller, meta veriler ve çok dilli bilgiler için entegrasyon sağlayın.',
+      getApiKey: 'API-Key buradan edinin →',
+      enable: 'TMDB Entegrasyonunu Etkinleştir',
+      apiKeyLabel: 'TMDB API-Key (v3)',
+      apiKeyPlaceholder: 'örn. a1b2c3d4e5f6...',
+      apiKeyHint: 'themoviedb.org\'dan TMDB API-Key (v3)',
+      testConnection: '🔍 Bağlantıyı Test Et',
+      testing: '⏳ Test ediliyor...',
+      save: '💾 TMDB Kaydet',
+      clearCache: '🗑️ Önbelleği Temizle',
+      successConnection: '✓ TMDB Bağlantısı başarılı!',
+      errorInvalidKey: '✗ Geçersiz API-Key. Lütfen anahtarı kontrol edin.',
+      errorConnection: '✗ Bağlantı başarısız',
+      successSaved: '✓ TMDB ayarları kaydedildi!',
+      successCacheCleared: '✓ Önbellek temizlendi! Sayfa yeniden yüklenecek...',
+      confirmClearCache: 'TMDB görsel önbelleğini gerçekten temizlemek istiyor musunuz? Sayfa yeniden yüklenecek ve tüm görseller TMDB\'den yeniden çekilecek.',
+      featuresTitle: 'TMDB Özellikleri:',
+      featurePosters: 'Yüksek kaliteli Poster & Backdrop görseller',
+      featureDescriptions: 'Çok dilli açıklamalar & meta veriler',
+      featureCast: 'Oyuncu kadrosu, ekip & yapım bilgileri',
+      featureEpisodes: 'Bölüm küçük resimleri & açıklamalar',
+      featureRatings: 'Puanlar, türler, yayın tarihleri',
+      cacheInfoTitle: 'Önbelleği Temizle:',
+      cacheInfoDesc: 'Tarayıcı önbelleğini temizler ve tüm TMDB görsellerini yeniden yükler. Görseller doğru görüntülenmiyorsa veya TMDB\'den en son görsellerin yüklendiğinden emin olmak istiyorsanız bu işlevi kullanın.'
+    },
+    epg: {
+      title: 'EPG Yönetimi',
+      settingsTitle: 'EPG Ayarları',
+      autoUpdate: 'Otomatik Güncelleme',
+      autoUpdateDesc: 'EPG verilerini belirtilen aralıkta otomatik olarak güncelle',
+      updateInterval: 'Güncelleme Aralığı (Saat)',
+      intervalDesc: 'Her {interval} saatte bir EPG verileri güncellenecek',
+      saveSettings: '💾 Ayarları Kaydet',
+      fetchAll: '🔄 Tüm Kaynakları Şimdi Güncelle',
+      addSource: 'Yeni EPG Kaynağı Ekle',
+      sourceName: 'İsim / Ülke',
+      sourceNamePlaceholder: 'örn. Türkiye EPG, Almanya EPG, Özel EPG',
+      sourceUrl: 'EPG Kaynak URL (XML.gz)',
+      sourceUrlPlaceholder: 'https://onetvguide.com/download.php?src=turska-dsmart&format=xml.gz',
+      sourceUrlHint: 'EPG verileri içeren XML.gz dosyasının bağlantısı',
+      testSource: '🔍 Kaynağı Test Et',
+      addSourceButton: '➕ Kaynak Ekle',
+      sourcesTitle: 'EPG Kaynakları',
+      noSources: 'EPG kaynağı yok',
+      addFirstSource: 'Yeni bir EPG kaynağı ekleyin',
+      channels: 'Kanallar',
+      programs: 'Programlar',
+      lastFetch: 'Son Çekim',
+      status: 'Durum',
+      never: 'Asla',
+      update: '🔄 Güncelle',
+      delete: '🗑️ Sil',
+      error: 'Hata',
+      successAdded: '✓ EPG kaynağı eklendi!',
+      successDeleted: '✓ EPG kaynağı silindi!',
+      successSaved: '✓ EPG ayarları kaydedildi!',
+      errorNoSources: '✗ Etkin EPG kaynağı yok!',
+      errorMissingFields: '✗ Lütfen isim ve URL girin!',
+      confirmDelete: 'Bu EPG kaynağını gerçekten silmek istiyor musunuz?',
+      progressTitle: 'EPG İşleniyor',
+      stageDownloading: 'İndiriliyor',
+      stageDecompressing: 'Açılıyor',
+      stageParsing: 'Analiz Ediliyor',
+      stageSaving: 'Kaydediliyor',
+      stageComplete: 'Tamamlandı',
+      stageError: 'Hata',
+      stageInitializing: 'Başlatılıyor',
+      successComplete: 'EPG başarıyla güncellendi!',
+      errorFailed: 'EPG güncellemesi başarısız oldu',
+      corsProxySettings: 'CORS Proxy Ayarları',
+      useCorsProxy: 'CORS Proxy Kullan',
+      useCorsProxyDesc: 'EPG indirme sırasında CORS sorunlarını aşmak için bir proxy sunucusu kullanır',
+      corsProxyUrl: 'CORS Proxy URL',
+      corsProxyPlaceholder: 'https://corsproxy.io/?{URL}',
+      corsProxyHint: 'EPG URL\'si için yer tutucu olarak {URL} kullanın',
+      corsProxyExamples: '💡 Örnekler:'
     }
+  },
+
+  // Profile
+  profile: {
+    title: 'Profilim',
+    accountInfo: 'Hesap Bilgileri',
+    username: 'Kullanıcı Adı',
+    password: 'Şifre',
+    subscription: 'Abonelik',
+    maxConnections: 'Maksimum Bağlantı',
+    activeConnections: 'Aktif Bağlantılar',
+    expiryDate: 'Bitiş Tarihi',
+    status: 'Durum',
+    accountType: 'Hesap Tipi',
+    trial: 'Deneme',
+    restreamer: 'Restreamer',
+    owner: 'Sahip',
+    closeProfile: 'Profili Kapat',
+    showPassword: 'Göster',
+    hidePassword: 'Gizle'
+  },
+
+  // Home
+  home: {
+    topMovies: 'Günün Top 10 Filmleri',
+    topSeries: 'Günün Top 10 Dizileri'
   },
 
   // Common
@@ -179,6 +298,7 @@ export default {
     search: 'Ara',
     loading: 'Yükleniyor...',
     error: 'Hata',
-    success: 'Başarılı'
+    success: 'Başarılı',
+    home: 'Ana Sayfa'
   }
 };

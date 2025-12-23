@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useLanguage } from './contexts/LanguageContext';
 import Login from './Login';
 import Header from './Header';
+import Home from './Home';
 import LiveTV from './LiveTV';
 import Movies from './Movies';
 import Series from './Series';
@@ -11,7 +12,11 @@ export default function App() {
   const { t } = useLanguage();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userData, setUserData] = useState(null);
-  const [activeTab, setActiveTab] = useState('live');
+  const [activeTab, setActiveTab] = useState('home');
+  const [selectedSeriesId, setSelectedSeriesId] = useState(null);
+  const [selectedMovieId, setSelectedMovieId] = useState(null);
+  const [selectedMovieCategory, setSelectedMovieCategory] = useState(null);
+  const [selectedSeriesCategory, setSelectedSeriesCategory] = useState(null);
 
   // Build API URL
   const buildApiUrl = () => {
@@ -112,45 +117,76 @@ export default function App() {
     localStorage.removeItem('tesla_tv_credentials');
   };
 
+  const handleNavigateToSeries = (seriesId) => {
+    setSelectedSeriesId(seriesId);
+    setActiveTab('series');
+  };
+
+  const handleNavigateToMovie = (movieId) => {
+    setSelectedMovieId(movieId);
+    setActiveTab('movies');
+  };
+
+  // Handle navigation from Profile (watchlist)
+  const handleProfileNavigation = (type, itemId) => {
+    if (type === 'movies') {
+      handleNavigateToMovie(itemId);
+    } else if (type === 'series') {
+      handleNavigateToSeries(itemId);
+    }
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    // Clear selected items when changing tabs
+    if (tab !== 'series') {
+      setSelectedSeriesId(null);
+      setSelectedSeriesCategory(null);
+    }
+    if (tab !== 'movies') {
+      setSelectedMovieId(null);
+      setSelectedMovieCategory(null);
+    }
+  };
+
+  const handleCategorySelect = (tabType, categoryId) => {
+    console.log('[App] Category selected:', tabType, categoryId);
+    if (tabType === 'movies') {
+      setSelectedMovieCategory(categoryId);
+    } else if (tabType === 'series') {
+      setSelectedSeriesCategory(categoryId);
+    }
+  };
+
   if (!isLoggedIn) {
     return <Login onLogin={handleLogin} />;
   }
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
-      <Header userData={userData} onLogout={handleLogout} />
+      <Header
+        userData={userData}
+        onLogout={handleLogout}
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        onProfileNavigation={handleProfileNavigation}
+        onCategorySelect={handleCategorySelect}
+      />
 
-      {/* Main Navigation */}
-      <nav className="bg-slate-900/50 backdrop-blur-sm border-b border-slate-800/30 sticky top-[73px] z-40">
-        <div className="container mx-auto px-6">
-          <div className="flex space-x-2">
-            {[
-              { id: 'live', label: t.nav.liveTV, icon: '📡' },
-              { id: 'movies', label: t.nav.movies, icon: '🎬' },
-              { id: 'series', label: t.nav.series, icon: '📺' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 px-6 py-4 font-semibold transition-all duration-300 border-b-2 ${
-                  activeTab === tab.id
-                    ? 'border-red-500 text-white bg-slate-800/50'
-                    : 'border-transparent text-slate-400 hover:text-white hover:bg-slate-800/30'
-                }`}
-              >
-                <span className="text-xl">{tab.icon}</span>
-                <span style={{fontFamily: 'Outfit, sans-serif'}}>{tab.label}</span>
-              </button>
-            ))}
-          </div>
+      {/* Breadcrumb Container - Always visible below header */}
+      <div className="bg-slate-950 border-b border-slate-800/30">
+        <div className="container mx-auto px-3 sm:px-6 py-2 sm:py-3">
+          {/* Breadcrumb will be rendered here by each page component */}
+          <div id="breadcrumb-container"></div>
         </div>
-      </nav>
+      </div>
 
       {/* Content Area */}
-      <main className="container mx-auto px-6 py-8">
-        {activeTab === 'live' && <LiveTV userData={userData} />}
-        {activeTab === 'movies' && <Movies userData={userData} />}
-        {activeTab === 'series' && <Series userData={userData} />}
+      <main className="container mx-auto px-3 sm:px-6 py-4 sm:py-6">
+        {activeTab === 'home' && <Home userData={userData} isActive={activeTab === 'home'} onTabChange={handleTabChange} onNavigateToSeries={handleNavigateToSeries} onNavigateToMovie={handleNavigateToMovie} />}
+        {activeTab === 'live' && <LiveTV userData={userData} isActive={activeTab === 'live'} onTabChange={handleTabChange} />}
+        {activeTab === 'movies' && <Movies userData={userData} isActive={activeTab === 'movies'} initialSelectedMovieId={selectedMovieId} initialSelectedCategory={selectedMovieCategory} onTabChange={handleTabChange} />}
+        {activeTab === 'series' && <Series userData={userData} isActive={activeTab === 'series'} initialSelectedSeriesId={selectedSeriesId} initialSelectedCategory={selectedSeriesCategory} onTabChange={handleTabChange} />}
       </main>
 
       <style>{`

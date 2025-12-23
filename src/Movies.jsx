@@ -1,282 +1,265 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useLanguage } from './contexts/LanguageContext';
-import VideoPlayer from './components/VideoPlayer';
+import MovieDetail from './MovieDetail';
+import Breadcrumb from './components/Breadcrumb';
+import CategoryTabsContainer from './components/CategoryTabsContainer';
+import { isTmdbEnabled, getMovieDetailsByName, getPosterUrl, extractYear } from './services/tmdb';
 
-export default function Movies({ userData }) {
+export default function Movies({ userData, isActive, initialSelectedMovieId, initialSelectedCategory, onTabChange }) {
   const { t } = useLanguage();
-  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(initialSelectedCategory || null);
   const [searchQuery, setSearchQuery] = useState('');
   const [categories, setCategories] = useState([]);
   const [movies, setMovies] = useState([]);
+  const [selectedMovieId, setSelectedMovieId] = useState(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [currentMovie, setCurrentMovie] = useState(null);
-  const [player, setPlayer] = useState(null);
-  const [shouldAutoFullscreen, setShouldAutoFullscreen] = useState(false);
 
-  // Build API URL
-  const buildApiUrl = () => {
-    const serverSettings = localStorage.getItem('adminServerSettings');
-    if (!serverSettings || !userData) return null;
+  // TMDB Data Cache - Map of movie name -> TMDB poster URL
+  const [tmdbPosterCache, setTmdbPosterCache] = useState({});
 
-    const { serverUrl, port, accessCode } = JSON.parse(serverSettings);
-
-    if (import.meta.env.DEV) {
-      return `/api/${accessCode}/`;
-    }
-
-    let baseUrl = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;
-
-    // Support relative URLs (starting with /) for proxy setup
-    if (baseUrl.startsWith('/')) {
-      return `${baseUrl}/${accessCode}/`;
-    }
-
-    if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
-      baseUrl = 'http://' + baseUrl;
-    }
-
-    // AUTOMATIC PROXY: Use proxy for cross-origin requests or Mixed Content
-    const isPageHttps = window.location.protocol === 'https:';
-    const isServerHttp = baseUrl.startsWith('http://');
-
-    // Check if server is on different origin (domain/port)
-    const serverUrlObj = new URL(port ? `${baseUrl}:${port}` : baseUrl);
-    const currentOrigin = window.location.origin;
-    const serverOrigin = serverUrlObj.origin;
-    const isCrossOrigin = currentOrigin !== serverOrigin;
-
-    // Use proxy if: (1) HTTPS→HTTP (Mixed Content) OR (2) Cross-Origin (CORS)
-    if ((isPageHttps && isServerHttp) || isCrossOrigin) {
-      const reason = isPageHttps && isServerHttp ? 'Mixed Content' : 'CORS';
-      console.log(`🔒 [Movies] ${reason} detected - using /api/ proxy for ${serverOrigin}`);
-      return `/api/${accessCode}/`;
-    }
-
-    return port ? `${baseUrl}:${port}/${accessCode}/` : `${baseUrl}/${accessCode}/`;
-  };
-
-  // Rewrite URLs to use proxy for CORS/Mixed Content
-  const rewriteUrlForProxy = (url) => {
-    if (!url) return url;
-
-    const serverSettings = localStorage.getItem('adminServerSettings');
-    if (!serverSettings) return url;
-
-    const { serverUrl, port } = JSON.parse(serverSettings);
-    let baseUrl = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;
-
-    // Support relative URLs - already using proxy
-    if (baseUrl.startsWith('/')) {
-      return url;
-    }
-
-    if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
-      baseUrl = 'http://' + baseUrl;
-    }
-
-    // Check if we need proxy
-    const isPageHttps = window.location.protocol === 'https:';
-    const isServerHttp = baseUrl.startsWith('http://');
-    const serverUrlObj = new URL(port ? `${baseUrl}:${port}` : baseUrl);
-    const currentOrigin = window.location.origin;
-    const serverOrigin = serverUrlObj.origin;
-    const isCrossOrigin = currentOrigin !== serverOrigin;
-
-    // If proxy is needed, rewrite URLs
-    if ((isPageHttps && isServerHttp) || isCrossOrigin) {
-      try {
-        const urlObj = new URL(url);
-
-        // Rewrite /play/ URLs
-        if (urlObj.pathname.startsWith('/play/')) {
-          const rewrittenUrl = urlObj.pathname + urlObj.search + urlObj.hash;
-          console.log(`🔄 [Movies] Rewriting stream URL: ${url} → ${rewrittenUrl}`);
-          return rewrittenUrl;
-        }
-
-        // Rewrite /images/ URLs
-        if (urlObj.pathname.startsWith('/images/')) {
-          const rewrittenUrl = urlObj.pathname + urlObj.search + urlObj.hash;
-          console.log(`🔄 [Movies] Rewriting image URL: ${url} → ${rewrittenUrl}`);
-          return rewrittenUrl;
-        }
-      } catch (e) {
-        console.error('Error rewriting URL:', e);
-      }
-    }
-
-    return url;
-  };
-
-  // Load categories and movies from API
+  // Handle initial selected movie from props (e.g., from Profile watchlist)
   useEffect(() => {
+    if (initialSelectedMovieId) {
+      setSelectedMovieId(initialSelectedMovieId);
+    }
+  }, [initialSelectedMovieId]);
+
+  // Handle initial selected category from props (e.g., from Header submenu)
+  useEffect(() => {
+    if (initialSelectedCategory !== undefined) {
+      console.log('[Movies] Setting category from Header:', initialSelectedCategory);
+      setSelectedCategory(initialSelectedCategory);
+    }
+  }, [initialSelectedCategory]);
+
+  // Load movies from M3U playlist - Only when tab is active
+  useEffect(() => {
+    // Only load if active and not yet loaded
+    if (!isActive || hasLoaded) {
+      console.log('[Movies] Skipping load - isActive:', isActive, 'hasLoaded:', hasLoaded);
+      return;
+    }
+
     const loadData = async () => {
       if (!userData) {
-        setError('No user data available');
-        setIsLoading(false);
+        console.error('[Movies] No user data available');
         return;
       }
 
+      console.log('[Movies] Loading VOD data from API - Tab activated');
       setIsLoading(true);
       setError(null);
 
       try {
-        const apiUrl = buildApiUrl();
-        if (!apiUrl) {
-          setError('Server nicht konfiguriert');
-          setIsLoading(false);
+        const playerApiUrl = '/api/player_api.php';
+
+        // Load VOD categories
+        const categoriesRes = await axios.get(playerApiUrl, {
+          params: {
+            username: userData.username,
+            password: userData.password,
+            action: 'get_vod_categories'
+          }
+        });
+
+        console.log('[Movies] Categories API response:', categoriesRes.data);
+
+        // Load VOD streams from API (like series)
+        const vodRes = await axios.get(playerApiUrl, {
+          params: {
+            username: userData.username,
+            password: userData.password,
+            action: 'get_vod_streams'
+          }
+        });
+
+        console.log('[Movies] VOD API response:', Array.isArray(vodRes.data) ? `Array with ${vodRes.data.length} items` : vodRes.data);
+
+        if (!Array.isArray(vodRes.data)) {
+          console.error('[Movies] Unexpected API response format');
+          setError('Fehler beim Laden der Filme');
           return;
         }
 
-        const serverSettings = JSON.parse(localStorage.getItem('adminServerSettings'));
+        const movieItems = vodRes.data;
+        console.log('[Movies] Total movies from API:', movieItems.length);
 
-        // Load VOD categories
-        const categoriesResponse = await axios.get(apiUrl, {
-          params: {
-            api_key: serverSettings.apiKey,
-            action: 'get_vod_categories'
-          },
-          timeout: 10000
-        });
-
-        console.log('[Movies] VOD Categories Response:', categoriesResponse.data);
-
-        if (categoriesResponse.data && categoriesResponse.data.status === 'STATUS_SUCCESS') {
-          const cats = categoriesResponse.data.data || [];
-          console.log('[Movies] VOD Categories loaded:', cats.length);
-          setCategories([
-            { category_id: null, category_name: t.movies.allMovies, parent_id: 0 },
-            ...cats
-          ]);
-        } else {
-          console.error('[Movies] VOD Categories failed:', categoriesResponse.data);
+        // Create a category name to ID mapping from categories
+        const categoryNameToId = new Map();
+        if (Array.isArray(categoriesRes.data)) {
+          categoriesRes.data.forEach(cat => {
+            if (cat.category_name && cat.category_id) {
+              categoryNameToId.set(cat.category_name.toLowerCase().trim(), cat.category_id);
+            }
+          });
         }
 
-        // Load VOD streams
-        const vodResponse = await axios.get(apiUrl, {
-          params: {
-            api_key: serverSettings.apiKey,
-            action: 'get_vod_streams'
-          },
-          timeout: 10000
+        // Deduplicate by name AND collect all genres for each movie
+        const uniqueMoviesMap = new Map();
+        movieItems.forEach(movie => {
+          const normalizedName = movie.name?.toLowerCase().trim();
+          if (!normalizedName) return;
+
+          if (!uniqueMoviesMap.has(normalizedName)) {
+            // Parse genre field to get all genres (like series)
+            const genreCategories = [];
+            const genreCategoryNames = [];
+
+            if (movie.genre) {
+              // Split by comma and parse each genre
+              const genres = movie.genre.split(',').map(g => g.trim());
+              genres.forEach(genre => {
+                const genreLower = genre.toLowerCase();
+                const categoryId = categoryNameToId.get(genreLower);
+                if (categoryId && !genreCategories.includes(categoryId)) {
+                  genreCategories.push(categoryId);
+                  // Capitalize first letter for display
+                  const capitalizedGenre = genre.charAt(0).toUpperCase() + genre.slice(1);
+                  genreCategoryNames.push(capitalizedGenre);
+                }
+              });
+            }
+
+            // If no genres found from parsing, use the category_name from the movie
+            const allCategories = genreCategories.length > 0
+              ? genreCategories
+              : (movie.category_name ? [movie.category_name] : []);
+
+            const allCategoryNames = genreCategoryNames.length > 0
+              ? genreCategoryNames
+              : (movie.category_name ? [movie.category_name] : []);
+
+            // First occurrence - create movie with categories array
+            uniqueMoviesMap.set(normalizedName, {
+              ...movie,
+              categories: allCategories,
+              category_names: allCategoryNames
+            });
+          } else {
+            const existing = uniqueMoviesMap.get(normalizedName);
+            // Add category if not already present
+            if (movie.category_id && !existing.categories.includes(movie.category_id)) {
+              existing.categories.push(movie.category_id);
+            }
+            if (movie.category_name && !existing.category_names.includes(movie.category_name)) {
+              existing.category_names.push(movie.category_name);
+            }
+            // Prefer movies with better images
+            if (movie.stream_icon && !existing.stream_icon) {
+              existing.stream_icon = movie.stream_icon;
+            }
+            // Prefer higher stream_id
+            if (movie.stream_id > existing.stream_id) {
+              existing.stream_id = movie.stream_id;
+            }
+          }
         });
 
-        console.log('[Movies] VOD Streams Response:', vodResponse.data);
+        const uniqueMovies = Array.from(uniqueMoviesMap.values());
+        console.log('[Movies] Unique movies after deduplication:', uniqueMovies.length);
 
-        if (vodResponse.data && vodResponse.data.status === 'STATUS_SUCCESS') {
-          const vodData = vodResponse.data.data || [];
-          console.log('[Movies] VOD Streams loaded:', vodData.length);
-          // Rewrite stream and cover URLs to use proxy
-          const vodWithRewrittenUrls = vodData.map(movie => ({
-            ...movie,
-            stream_icon: movie.stream_icon ? rewriteUrlForProxy(movie.stream_icon) : movie.stream_icon,
-            container_extension: movie.container_extension || 'mp4'
-          }));
-          setMovies(vodWithRewrittenUrls);
-        } else {
-          console.error('[Movies] VOD Streams failed:', vodResponse.data);
+        // Debug: Check if movies have ratings
+        const moviesWithRatings = uniqueMovies.filter(m => m.rating);
+        console.log('[Movies] Movies with ratings:', moviesWithRatings.length, '/', uniqueMovies.length);
+        if (uniqueMovies.length > 0) {
+          console.log('[Movies] Sample movie data:', {
+            name: uniqueMovies[0].name,
+            rating: uniqueMovies[0].rating,
+            allFields: Object.keys(uniqueMovies[0])
+          });
         }
 
-      } catch (error) {
-        console.error('Error loading VOD data:', error);
-        setError(error.message);
+        // Set categories from API
+        if (Array.isArray(categoriesRes.data)) {
+          const allCategories = [
+            { category_id: null, category_name: t.movies.allMovies },
+            ...categoriesRes.data
+          ];
+          console.log('[Movies] Categories loaded:', allCategories.length);
+          setCategories(allCategories);
+        } else {
+          setCategories([{ category_id: null, category_name: t.movies.allMovies }]);
+        }
+
+        setMovies(uniqueMovies);
+
+        // Mark as loaded AFTER data is set
+        setHasLoaded(true);
+
+      } catch (err) {
+        console.error('[Movies] Error loading VOD data:', err);
+        setError(err.message || 'Fehler beim Laden der Filme');
       } finally {
         setIsLoading(false);
       }
     };
 
     loadData();
-  }, [userData, t]);
+  }, [isActive, hasLoaded, userData, t]);
 
-  // Auto fullscreen when player is ready
-  useEffect(() => {
-    if (player && shouldAutoFullscreen) {
-      // Small delay to ensure player is fully initialized
-      const timeout = setTimeout(() => {
-        try {
-          if (player.requestFullscreen) {
-            player.requestFullscreen();
-          } else if (player.el_ && player.el_.requestFullscreen) {
-            player.el_.requestFullscreen();
-          }
-        } catch (error) {
-          console.error('Fullscreen request failed:', error);
-          // Fallback to panel view if fullscreen fails
-          setShouldAutoFullscreen(false);
-        }
-      }, 300);
-
-      // Fallback: if fullscreen doesn't activate within 2 seconds, show panel
-      const fallbackTimeout = setTimeout(() => {
-        const isFullscreen = !!(
-          document.fullscreenElement ||
-          document.webkitFullscreenElement ||
-          document.mozFullScreenElement ||
-          document.msFullscreenElement
-        );
-
-        if (!isFullscreen && shouldAutoFullscreen) {
-          console.log('Fullscreen did not activate, falling back to panel view');
-          setShouldAutoFullscreen(false);
-        }
-      }, 2000);
-
-      return () => {
-        clearTimeout(timeout);
-        clearTimeout(fallbackTimeout);
-      };
+  // Get poster URL - prefer TMDB if available
+  const getMoviePoster = (movie) => {
+    // Check TMDB cache first
+    if (tmdbPosterCache[movie.name]) {
+      return tmdbPosterCache[movie.name];
     }
-  }, [player, shouldAutoFullscreen]);
 
-  // Close video player when exiting fullscreen (only if auto-fullscreen was active)
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      const isFullscreen = !!(
-        document.fullscreenElement ||
-        document.webkitFullscreenElement ||
-        document.mozFullScreenElement ||
-        document.msFullscreenElement
-      );
+    // Return local poster for now, TMDB will be fetched lazily
+    return movie.stream_icon || movie.cover;
+  };
 
-      // If we exit fullscreen and a movie is playing with auto-fullscreen, close the player
-      if (!isFullscreen && currentMovie && shouldAutoFullscreen) {
-        setCurrentMovie(null);
-        setShouldAutoFullscreen(false);
-        if (player) {
-          player.pause();
-        }
+  // Lazily fetch TMDB poster for a movie
+  const fetchTmdbPoster = async (movie) => {
+    if (!isTmdbEnabled()) return;
+    if (tmdbPosterCache[movie.name]) return; // Already cached
+
+    try {
+      const year = extractYear(movie.added) || null;
+      const tmdbMovie = await getMovieDetailsByName(movie.name, year, t.langCode);
+
+      if (tmdbMovie?.poster_path) {
+        const posterUrl = getPosterUrl(tmdbMovie.poster_path, 'w500');
+        setTmdbPosterCache(prev => ({
+          ...prev,
+          [movie.name]: posterUrl
+        }));
       }
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
-    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
-
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
-      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
-    };
-  }, [currentMovie, player, shouldAutoFullscreen]);
+    } catch (error) {
+      console.error('[Movies] Error fetching TMDB poster:', error);
+    }
+  };
 
   // Filter movies by category and search query
   const filteredMovies = movies.filter(movie => {
     const matchesSearch = movie.name?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === null || movie.category_id === selectedCategory;
+    const matchesCategory = selectedCategory === null || movie.categories?.includes(selectedCategory);
     return matchesSearch && matchesCategory;
   });
 
   // Count movies per category
   const getCategoryCount = (categoryId) => {
     if (categoryId === null) return movies.length;
-    return movies.filter(m => m.category_id === categoryId).length;
+    return movies.filter(m => m.categories?.includes(categoryId)).length;
   };
 
-  if (isLoading) {
+  // If a movie is selected, show MovieDetail
+  if (selectedMovieId) {
+    const selectedMovie = movies.find(m => m.stream_id === selectedMovieId);
+    return (
+      <MovieDetail
+        movieId={selectedMovieId}
+        movieCategory={null}
+        userData={userData}
+        onBack={() => setSelectedMovieId(null)}
+        onTabChange={onTabChange}
+      />
+    );
+  }
+
+  if (isLoading || !hasLoaded) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-140px)]">
         <div className="text-center">
@@ -301,234 +284,104 @@ export default function Movies({ userData }) {
     );
   }
 
+  // Build breadcrumb items
+  const selectedCategoryObj = categories.find(c => c.category_id === selectedCategory);
+  const hasSelectedCategory = selectedCategoryObj && selectedCategoryObj.category_id !== null;
+
+  const breadcrumbItems = [
+    {
+      label: t.nav.movies,
+      // Make it clickable if a category is selected (to go back to "All Movies")
+      ...(hasSelectedCategory ? { onClick: () => setSelectedCategory(null) } : {})
+    }
+  ];
+
+  // Add category if selected
+  if (hasSelectedCategory) {
+    breadcrumbItems.push({ label: selectedCategoryObj.category_name });
+  }
+
   return (
-    <div className="flex h-[calc(100vh-140px)] gap-4">
-      {/* Categories Sidebar */}
-      <div className={`${currentMovie ? 'w-64' : 'w-80'} bg-slate-900/50 backdrop-blur-sm rounded-xl border border-slate-800/30 overflow-hidden flex flex-col transition-all duration-300`}>
-        <div className="p-4 border-b border-slate-800/50">
-          <h2 className="text-lg font-bold text-white flex items-center" style={{fontFamily: 'Outfit, sans-serif'}}>
-            <span className="text-2xl mr-2">🎬</span>
-            {t.movies.categories}
-          </h2>
-        </div>
+    <div>
+      {/* Breadcrumb */}
+      <Breadcrumb items={breadcrumbItems} onHomeClick={onTabChange} />
 
-        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-          <div className="p-2">
-            {categories.map((category) => (
-              <button
-                key={category.category_id ?? 'all'}
-                onClick={() => setSelectedCategory(category.category_id)}
-                className={`w-full text-left px-4 py-3 rounded-lg mb-1 transition-all duration-200 flex items-center justify-between group ${
-                  selectedCategory === category.category_id
-                    ? 'bg-red-500/20 text-white border border-red-500/30'
-                    : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
-                }`}
-              >
-                <span className="font-medium">{category.category_name}</span>
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  selectedCategory === category.category_id
-                    ? 'bg-red-500/30 text-red-300'
-                    : 'bg-slate-800/50 text-slate-500 group-hover:bg-slate-700/50 group-hover:text-slate-400'
-                }`}>
-                  {getCategoryCount(category.category_id)}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      {/* Category Tabs */}
+      <CategoryTabsContainer
+        categories={categories}
+        selectedCategory={selectedCategory}
+        onCategoryChange={setSelectedCategory}
+      />
 
-      {/* Movies Content */}
-      <div className={`${currentMovie ? 'w-96' : 'flex-1'} bg-slate-900/50 backdrop-blur-sm rounded-xl border border-slate-800/30 overflow-hidden flex flex-col transition-all duration-300`}>
-        {/* Search Header */}
-        <div className="p-4 border-b border-slate-800/50">
-          <div className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t.movies.searchPlaceholder}
-              className="w-full bg-slate-800/50 border border-slate-700/50 rounded-xl px-4 py-3 pl-12 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-transparent transition-all"
-            />
-            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      {/* Movies Grid */}
+      <div>
+        {filteredMovies.length === 0 ? (
+          <div className="text-center py-20 text-slate-500">
+            <svg className="w-20 h-20 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
             </svg>
+            <p className="font-medium text-lg">{t.movies.noResults}</p>
           </div>
-        </div>
-
-        {/* Movies Grid */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
-          {filteredMovies.length === 0 ? (
-            <div className="text-center py-20 text-slate-500">
-              <svg className="w-20 h-20 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
-              </svg>
-              <p className="font-medium text-lg">{t.movies.noResults}</p>
-            </div>
-          ) : (
-            <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {filteredMovies.map((movie, index) => {
-                // Build stream URL from stream_id and container_extension
-                const serverSettings = JSON.parse(localStorage.getItem('adminServerSettings') || '{}');
-                const { username, password } = userData || {};
-                const streamUrl = rewriteUrlForProxy(
-                  `${serverSettings.serverUrl}:${serverSettings.port || 80}/movie/${username}/${password}/${movie.stream_id}.${movie.container_extension}`
-                );
-
-                return (
-                  <div
-                    key={movie.stream_id || index}
-                    onClick={() => {
-                      setCurrentMovie({...movie, url: streamUrl});
-                      setShouldAutoFullscreen(true);
-                    }}
-                    className="group relative bg-slate-900/50 backdrop-blur-sm rounded-xl overflow-hidden border border-slate-800/30 hover:border-red-500/50 transition-all duration-300 hover:scale-105 hover:shadow-xl hover:shadow-red-500/10 cursor-pointer"
-                  >
-                    {/* Poster */}
-                    <div className="aspect-[2/3] bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center relative overflow-hidden">
-                      {movie.stream_icon ? (
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 pb-8">
+            {filteredMovies.map((movie, index) => {
+              return (
+                <div
+                  key={movie.stream_id || index}
+                  onClick={() => setSelectedMovieId(movie.stream_id)}
+                  className="group cursor-pointer"
+                >
+                  {/* Poster */}
+                  <div className="relative aspect-[2/3] bg-slate-800 rounded-lg overflow-hidden mb-2">
+                    {(() => {
+                      const posterUrl = getMoviePoster(movie);
+                      // Lazily fetch TMDB poster if enabled
+                      if (isTmdbEnabled() && !tmdbPosterCache[movie.name]) {
+                        fetchTmdbPoster(movie);
+                      }
+                      return posterUrl ? (
                         <img
-                          src={movie.stream_icon}
+                          src={posterUrl}
                           alt={movie.name}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           onError={(e) => {
                             e.target.style.display = 'none';
                             e.target.nextElementSibling.style.display = 'flex';
                           }}
                         />
-                      ) : null}
-                      <div className={movie.stream_icon ? 'hidden absolute inset-0 bg-gradient-to-br from-red-500/20 to-orange-600/20 flex items-center justify-center' : 'absolute inset-0 bg-gradient-to-br from-red-500/20 to-orange-600/20 flex items-center justify-center'}>
-                        <svg className="w-16 h-16 text-slate-700 group-hover:text-red-500 transition-colors" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M8 5v14l11-7z"/>
+                      ) : null;
+                    })()}
+                    <div className={movie.stream_icon ? 'hidden absolute inset-0 bg-gradient-to-br from-red-500/20 to-orange-600/20 flex items-center justify-center' : 'absolute inset-0 bg-gradient-to-br from-red-500/20 to-orange-600/20 flex items-center justify-center'}>
+                      <svg className="w-16 h-16 text-slate-700 group-hover:text-red-500 transition-colors" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                      </svg>
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                    {/* Rating Badge - Bottom Right */}
+                    {movie.rating && (
+                      <div className="absolute bottom-2 right-2 z-10 flex items-center bg-black/80 backdrop-blur-sm px-2 py-1 rounded">
+                        <svg className="w-3 h-3 text-yellow-500 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                         </svg>
+                        <span className="text-xs text-yellow-500 font-bold">{parseFloat(movie.rating).toFixed(1)}</span>
                       </div>
-                      <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 to-orange-600/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    </div>
-
-                    {/* Info */}
-                    <div className="p-3">
-                      <h3 className="font-semibold text-sm mb-1 truncate group-hover:text-red-400 transition-colors">
-                        {movie.name}
-                      </h3>
-                      <p className="text-xs text-slate-600 mt-1 truncate">
-                        {categories.find(c => c.category_id === movie.category_id)?.category_name || ''}
-                      </p>
-                    </div>
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
 
-        {/* Footer Info */}
-        <div className="p-3 border-t border-slate-800/50 bg-slate-900/30">
-          <p className="text-xs text-slate-500 text-center">
-            {filteredMovies.length} {t.movies.moviesShowing}
-          </p>
-        </div>
+                  {/* Info */}
+                  <h3 className="text-sm font-medium text-white line-clamp-2 group-hover:text-red-400 transition-colors mb-1">
+                    {movie.name}
+                  </h3>
+                  <p className="text-xs text-slate-500 truncate">
+                    {movie.category_names?.join(', ') || movie.genre || ''}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
-
-      {/* Hidden VideoPlayer for auto-fullscreen */}
-      {currentMovie && shouldAutoFullscreen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 99999 }}>
-          <VideoPlayer
-            src={currentMovie.url}
-            poster={currentMovie.stream_icon}
-            autoplay={true}
-            onReady={(playerInstance) => {
-              setPlayer(playerInstance);
-            }}
-          />
-        </div>
-      )}
-
-      {/* Video Player Panel - Visible when NOT in auto-fullscreen mode */}
-      {currentMovie && !shouldAutoFullscreen && (
-        <div className="flex-1 bg-slate-900/50 backdrop-blur-sm rounded-xl border border-slate-800/30 overflow-hidden flex flex-col">
-          {/* Player Header */}
-          <div className="p-4 border-b border-slate-800/50 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              {currentMovie.tvg_logo && (
-                <img
-                  src={currentMovie.tvg_logo}
-                  alt={currentMovie.name}
-                  className="w-12 h-12 rounded-lg object-cover"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
-              )}
-              <div>
-                <h2 className="text-lg font-bold text-white" style={{fontFamily: 'Outfit, sans-serif'}}>
-                  {currentMovie.name || currentMovie.tvg_name}
-                </h2>
-                <p className="text-sm text-slate-400">{currentMovie.group_title}</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setCurrentMovie(null)}
-              className="p-2 hover:bg-slate-800/50 rounded-lg transition-colors"
-              title="Close player"
-            >
-              <svg className="w-6 h-6 text-slate-400 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Video Player Content */}
-          <div className="p-4 space-y-4">
-            {/* Video Player */}
-            <div className="bg-black rounded-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
-              <VideoPlayer
-                src={currentMovie.url}
-                poster={currentMovie.tvg_logo}
-                autoplay={true}
-                onReady={(playerInstance) => {
-                  setPlayer(playerInstance);
-                }}
-              />
-            </div>
-
-            {/* Movie Information */}
-            <div className="bg-slate-800/30 backdrop-blur-sm rounded-xl border border-slate-700/30 p-4">
-              <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {t.movies.title || 'Film-Informationen'}
-              </h3>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">{t.movies.title || 'Titel'}</p>
-                  <p className="text-sm text-white">{currentMovie.name || currentMovie.tvg_name}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">{t.movies.categories || 'Kategorie'}</p>
-                  <p className="text-sm text-white">{currentMovie.group_title || 'N/A'}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        .scrollbar-thin::-webkit-scrollbar {
-          width: 6px;
-        }
-        .scrollbar-thin::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .scrollbar-thin::-webkit-scrollbar-thumb {
-          background: rgb(51 65 85);
-          border-radius: 3px;
-        }
-        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-          background: rgb(71 85 105);
-        }
-      `}</style>
     </div>
   );
 }

@@ -19,6 +19,16 @@ export default defineConfig({
             console.log('Proxying:', req.method, req.url, '→', proxyReq.path);
           });
         }
+      },
+      '/images': {
+        target: 'http://144.76.200.209',
+        changeOrigin: true,
+        configure: (proxy, options) => {
+          // Log image proxy requests for debugging
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('Proxying Image:', req.method, req.url, '→', proxyReq.path);
+          });
+        }
       }
     }
   },

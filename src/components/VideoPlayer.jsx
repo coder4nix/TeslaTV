@@ -24,6 +24,18 @@ export default function VideoPlayer({ src, poster, autoplay = true, onReady }) {
 
       videoRef.current.appendChild(videoElement);
 
+      // Determine video type from URL
+      let videoType = 'video/mp4';
+      if (src.includes('.m3u8') || src.includes('/m3u8')) {
+        videoType = 'application/x-mpegURL';
+      } else if (src.includes('%23.mp4') || src.includes('#.mp4')) {
+        videoType = 'video/mp4';
+      } else if (src.includes('%23.mkv') || src.includes('#.mkv')) {
+        videoType = 'video/mp4';  // MKV plays as MP4 in browser
+      }
+
+      console.log('[VideoPlayer] Loading video:', { src, type: videoType });
+
       const player = playerRef.current = videojs(videoElement, {
         controls: true,
         autoplay: autoplay,
@@ -45,10 +57,10 @@ export default function VideoPlayer({ src, poster, autoplay = true, onReady }) {
         },
         sources: [{
           src: src,
-          type: src.endsWith('.m3u8') ? 'application/x-mpegURL' : 'video/mp4'
+          type: videoType
         }]
       }, () => {
-        console.log('Player is ready');
+        console.log('[VideoPlayer] Player is ready');
 
         // Append overlay to player element so it's included in fullscreen
         if (overlayRef.current && player.el()) {

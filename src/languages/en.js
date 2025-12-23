@@ -13,14 +13,17 @@ export default {
     expiryDate: 'Expiry Date',
     unlimited: 'Unlimited',
     statusActive: 'Active',
-    statusInactive: 'Inactive'
+    statusInactive: 'Inactive',
+    searchPlaceholder: 'Search movies, series, programs, actors'
   },
 
   // Navigation
   nav: {
     liveTV: 'Live TV',
     movies: 'Movies',
-    series: 'Series'
+    series: 'Series',
+    allMovies: 'All Movies',
+    allSeries: 'All Series'
   },
 
   // Login
@@ -48,6 +51,8 @@ export default {
     searchPlaceholder: 'Search channels...',
     noResults: 'No results found',
     live: 'LIVE',
+    watchNow: 'Watch Now',
+    currentlyPopular: 'Currently Popular',
     channelsShowing: 'channels showing',
     streamInfo: 'Stream Information',
     channelId: 'Channel ID',
@@ -95,6 +100,15 @@ export default {
     seriesShowing: 'series showing',
     season: 'Season',
     episode: 'Episode',
+    startWatching: 'Start Watching',
+    like: 'Like',
+    dislike: 'Dislike',
+    addToWatchlist: 'Add to Watchlist',
+    share: 'Share',
+    episodes: 'Episodes',
+    similarContent: 'Similar Content',
+    cast: 'Cast',
+    extras: 'Extras',
     categoryAction: 'Action',
     categoryComedy: 'Comedy',
     categoryDrama: 'Drama',
@@ -165,7 +179,112 @@ export default {
       serverSettings: 'Server Settings',
       userLines: 'User Lines',
       settings: 'Settings'
+    },
+    tmdb: {
+      title: 'TMDB Integration',
+      subtitle: 'Integrate The Movie Database (TMDB) for high-quality images, metadata and multi-language information.',
+      getApiKey: 'Get API-Key here →',
+      enable: 'Enable TMDB Integration',
+      apiKeyLabel: 'TMDB API-Key (v3)',
+      apiKeyPlaceholder: 'e.g. a1b2c3d4e5f6...',
+      apiKeyHint: 'Your TMDB API-Key (v3) from themoviedb.org',
+      testConnection: '🔍 Test Connection',
+      testing: '⏳ Testing...',
+      save: '💾 Save TMDB',
+      clearCache: '🗑️ Clear Cache',
+      successConnection: '✓ TMDB connection successful!',
+      errorInvalidKey: '✗ Invalid API-Key. Please check the key.',
+      errorConnection: '✗ Connection failed',
+      successSaved: '✓ TMDB settings saved!',
+      successCacheCleared: '✓ Cache cleared! Page will reload...',
+      confirmClearCache: 'Do you really want to clear the TMDB image cache? The page will reload and all images will be fetched fresh from TMDB.',
+      featuresTitle: 'TMDB Features:',
+      featurePosters: 'High-quality Poster & Backdrop images',
+      featureDescriptions: 'Multi-language descriptions & metadata',
+      featureCast: 'Cast, Crew & production information',
+      featureEpisodes: 'Episode thumbnails & descriptions',
+      featureRatings: 'Ratings, genres, release dates',
+      cacheInfoTitle: 'Clear Cache:',
+      cacheInfoDesc: 'Clears the browser cache and reloads all TMDB images. Use this function if images are not displayed correctly or you want to ensure the latest images are loaded from TMDB.'
+    },
+    epg: {
+      title: 'EPG Management',
+      settingsTitle: 'EPG Settings',
+      autoUpdate: 'Auto Update',
+      autoUpdateDesc: 'Automatically update EPG data at specified intervals',
+      updateInterval: 'Update Interval (Hours)',
+      intervalDesc: 'EPG data will be updated every {interval} hours',
+      saveSettings: '💾 Save Settings',
+      fetchAll: '🔄 Update All Sources Now',
+      addSource: 'Add New EPG Source',
+      sourceName: 'Name / Country',
+      sourceNamePlaceholder: 'e.g. Turkey EPG, Germany EPG, My Custom EPG',
+      sourceUrl: 'EPG Source URL (XML.gz)',
+      sourceUrlPlaceholder: 'https://onetvguide.com/download.php?src=turska-dsmart&format=xml.gz',
+      sourceUrlHint: 'Link to XML.gz file with EPG data',
+      testSource: '🔍 Test Source',
+      addSourceButton: '➕ Add Source',
+      sourcesTitle: 'EPG Sources',
+      noSources: 'No EPG sources available',
+      addFirstSource: 'Add a new EPG source',
+      channels: 'Channels',
+      programs: 'Programs',
+      lastFetch: 'Last Fetch',
+      status: 'Status',
+      never: 'Never',
+      update: '🔄 Update',
+      delete: '🗑️ Delete',
+      error: 'Error',
+      successAdded: '✓ EPG source added!',
+      successDeleted: '✓ EPG source deleted!',
+      successSaved: '✓ EPG settings saved!',
+      errorNoSources: '✗ No enabled EPG sources!',
+      errorMissingFields: '✗ Please enter name and URL!',
+      confirmDelete: 'Do you really want to delete this EPG source?',
+      progressTitle: 'Processing EPG',
+      stageDownloading: 'Downloading',
+      stageDecompressing: 'Decompressing',
+      stageParsing: 'Parsing',
+      stageSaving: 'Saving',
+      stageComplete: 'Complete',
+      stageError: 'Error',
+      stageInitializing: 'Initializing',
+      successComplete: 'EPG updated successfully!',
+      errorFailed: 'EPG update failed',
+      corsProxySettings: 'CORS Proxy Settings',
+      useCorsProxy: 'Use CORS Proxy',
+      useCorsProxyDesc: 'Uses a proxy server to bypass CORS issues when downloading EPG',
+      corsProxyUrl: 'CORS Proxy URL',
+      corsProxyPlaceholder: 'https://corsproxy.io/?{URL}',
+      corsProxyHint: 'Use {URL} as placeholder for the EPG URL',
+      corsProxyExamples: '💡 Examples:'
     }
+  },
+
+  // Profile
+  profile: {
+    title: 'My Profile',
+    accountInfo: 'Account Information',
+    username: 'Username',
+    password: 'Password',
+    subscription: 'Subscription',
+    maxConnections: 'Max Connections',
+    activeConnections: 'Active Connections',
+    expiryDate: 'Expiry Date',
+    status: 'Status',
+    accountType: 'Account Type',
+    trial: 'Trial',
+    restreamer: 'Restreamer',
+    owner: 'Owner',
+    closeProfile: 'Close Profile',
+    showPassword: 'Show',
+    hidePassword: 'Hide'
+  },
+
+  // Home
+  home: {
+    topMovies: "Today's Top 10 Movies",
+    topSeries: "Today's Top 10 Series"
   },
 
   // Common
@@ -179,6 +298,7 @@ export default {
     search: 'Search',
     loading: 'Loading...',
     error: 'Error',
-    success: 'Success'
+    success: 'Success',
+    home: 'Home'
   }
 };
