@@ -4,6 +4,7 @@ import { useLanguage } from './contexts/LanguageContext';
 import { useUserPreferences } from './contexts/UserPreferencesContext';
 import VideoPlayer from './components/VideoPlayer';
 import Breadcrumb from './components/Breadcrumb';
+import { rewriteImageUrl, rewriteStreamUrl } from './utils/urlRewriter';
 
 export default function MovieDetail({ movieId, movieCategory, userData, onBack, onTabChange }) {
   const { t } = useLanguage();
@@ -113,11 +114,11 @@ export default function MovieDetail({ movieId, movieCategory, userData, onBack, 
       {(info.backdrop_path || movie.stream_icon) && (
         <div className="relative w-full h-[70vh] mb-8 overflow-hidden">
           <img
-            src={info.backdrop_path?.[0] || movie.stream_icon}
+            src={info.backdrop_path?.[0] || rewriteImageUrl(movie.stream_icon)}
             alt={info.name}
             className="w-full h-full object-cover"
             onError={(e) => {
-              e.target.src = movie.stream_icon || 'https://via.placeholder.com/1920x1080/1e293b/64748b?text=No+Backdrop';
+              e.target.src = rewriteImageUrl(movie.stream_icon) || 'https://via.placeholder.com/1920x1080/1e293b/64748b?text=No+Backdrop';
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-transparent"></div>
@@ -255,7 +256,7 @@ export default function MovieDetail({ movieId, movieCategory, userData, onBack, 
             {movie.stream_icon && (
               <div className="mb-6">
                 <img
-                  src={movie.stream_icon}
+                  src={rewriteImageUrl(movie.stream_icon)}
                   alt={info.name}
                   className="w-full rounded-xl shadow-2xl"
                   onError={(e) => {

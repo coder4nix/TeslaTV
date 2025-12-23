@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useLanguage } from './contexts/LanguageContext';
 import Breadcrumb from './components/Breadcrumb';
 import { isTmdbEnabled, getMovieDetailsByName, getSeriesDetailsByName, getPosterUrl, extractYear } from './services/tmdb';
+import { rewriteImageUrl } from './utils/urlRewriter';
 
 export default function Home({ userData, isActive, onTabChange, onNavigateToSeries, onNavigateToMovie }) {
   const { t } = useLanguage();
@@ -161,7 +162,9 @@ export default function Home({ userData, isActive, onTabChange, onNavigateToSeri
     if (tmdbPosterCache[cacheKey]) {
       return tmdbPosterCache[cacheKey];
     }
-    return item.stream_icon || item.cover;
+    // Apply URL rewriting for proxy
+    const localPoster = item.stream_icon || item.cover;
+    return rewriteImageUrl(localPoster);
   };
 
   // Lazily fetch TMDB poster

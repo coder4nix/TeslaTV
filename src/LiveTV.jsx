@@ -5,6 +5,7 @@ import VideoPlayer from './components/VideoPlayer';
 import Breadcrumb from './components/Breadcrumb';
 import CategoryTabsContainer from './components/CategoryTabsContainer';
 import ChannelEpg from './components/ChannelEpg';
+import { rewriteImageUrl, rewriteStreamUrl } from './utils/urlRewriter';
 
 export default function LiveTV({ userData, isActive, onTabChange }) {
   const { t } = useLanguage();
@@ -168,7 +169,7 @@ export default function LiveTV({ userData, isActive, onTabChange }) {
         <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900/95 to-transparent">
           {selectedChannel?.stream_icon && (
             <img
-              src={selectedChannel.stream_icon}
+              src={rewriteImageUrl(selectedChannel.stream_icon)}
               alt={selectedChannel.name}
               className="absolute right-0 top-0 h-full w-1/2 object-cover opacity-30"
               style={{
@@ -185,7 +186,7 @@ export default function LiveTV({ userData, isActive, onTabChange }) {
           {selectedChannel?.stream_icon && (
             <div className="mb-6">
               <img
-                src={selectedChannel.stream_icon}
+                src={rewriteImageUrl(selectedChannel.stream_icon)}
                 alt={selectedChannel.name}
                 className="h-24 w-auto object-contain"
                 onError={(e) => e.target.style.display = 'none'}
@@ -298,7 +299,7 @@ export default function LiveTV({ userData, isActive, onTabChange }) {
             >
               {channel.stream_icon ? (
                 <img
-                  src={channel.stream_icon}
+                  src={rewriteImageUrl(channel.stream_icon)}
                   alt={channel.name}
                   className="w-full h-full object-contain p-2"
                   onError={(e) => {
@@ -333,7 +334,7 @@ export default function LiveTV({ userData, isActive, onTabChange }) {
             >
               {channel.stream_icon ? (
                 <img
-                  src={channel.stream_icon}
+                  src={rewriteImageUrl(channel.stream_icon)}
                   alt={channel.name}
                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                   onError={(e) => {
@@ -382,7 +383,7 @@ export default function LiveTV({ userData, isActive, onTabChange }) {
               <div className="flex items-center gap-3 mb-2">
                 {selectedChannel.stream_icon && (
                   <img
-                    src={selectedChannel.stream_icon}
+                    src={rewriteImageUrl(selectedChannel.stream_icon)}
                     alt={selectedChannel.name}
                     className="w-12 h-12 rounded-lg object-cover"
                     onError={(e) => e.target.style.display = 'none'}
@@ -407,8 +408,8 @@ export default function LiveTV({ userData, isActive, onTabChange }) {
 
           {/* Video Player */}
           <VideoPlayer
-            src={selectedChannel.url}
-            poster={selectedChannel.stream_icon}
+            src={rewriteStreamUrl(selectedChannel.url)}
+            poster={rewriteImageUrl(selectedChannel.stream_icon)}
             autoplay={true}
             className="w-full h-full"
           />

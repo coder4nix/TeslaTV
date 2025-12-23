@@ -5,6 +5,7 @@ import { useUserPreferences } from './contexts/UserPreferencesContext';
 import VideoPlayer from './components/VideoPlayer';
 import Breadcrumb from './components/Breadcrumb';
 import { isTmdbEnabled, getSeriesDetailsByName, getSeasonDetails, getBackdropUrl, getPosterUrl, extractYear } from './services/tmdb';
+import { rewriteImageUrl } from './utils/urlRewriter';
 
 export default function SeriesDetail({ seriesId, userData, onBack, onTabChange }) {
   const { t } = useLanguage();
@@ -54,43 +55,6 @@ export default function SeriesDetail({ seriesId, userData, onBack, onTabChange }
       }
     } catch (error) {
       console.error('[SeriesDetail] Error fetching TMDB data:', error);
-    }
-  };
-
-  // Helper function to convert absolute image URLs to proxy-friendly relative URLs
-  const getProxyImageUrl = (url) => {
-    if (!url) return null;
-    // Ensure url is a string
-    if (typeof url !== 'string') return null;
-    // If URL is already relative, return as-is
-    if (url.startsWith('/')) return url;
-
-    // Skip TMDB URLs if they're incomplete (missing image ID)
-    if (url.includes('image.tmdb.org')) {
-      // TMDB URLs should end with an image file (e.g., .jpg)
-      if (!url.match(/\.(jpg|jpeg|png|webp)$/i)) {
-        console.log('[SeriesDetail] Skipping incomplete TMDB URL:', url);
-        return null; // Skip incomplete TMDB URLs
-      }
-      console.log('[SeriesDetail] Using TMDB URL directly:', url);
-      return url;
-    }
-
-    // If URL is from local server, extract path to use with proxy
-    try {
-      const urlObj = new URL(url);
-      // Only convert local server URLs (144.76.200.209)
-      if (urlObj.hostname === '144.76.200.209' || urlObj.hostname.includes('tesla-tv')) {
-        const proxyPath = urlObj.pathname; // Returns just the /images/... part
-        console.log('[SeriesDetail] Converting local URL to proxy:', url, '→', proxyPath);
-        return proxyPath;
-      }
-      // For other external URLs, use as-is
-      console.log('[SeriesDetail] Using external URL as-is:', url);
-      return url;
-    } catch (e) {
-      console.log('[SeriesDetail] URL parsing failed, using original:', url);
-      return url; // If parsing fails, return original
     }
   };
 
@@ -244,7 +208,7 @@ export default function SeriesDetail({ seriesId, userData, onBack, onTabChange }
                 ];
 
                 for (const source of imageSources) {
-                  imageUrl = getProxyImageUrl(source);
+                  imageUrl = rewriteImageUrl(source);
                   if (imageUrl) break;
                 }
               }
@@ -460,7 +424,7 @@ export default function SeriesDetail({ seriesId, userData, onBack, onTabChange }
                     ];
 
                     for (const source of episodeImageSources) {
-                      episodeImageUrl = getProxyImageUrl(source);
+                      episodeImageUrl = rewriteImageUrl(source);
                       if (episodeImageUrl) break;
                     }
                   }

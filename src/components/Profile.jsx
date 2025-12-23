@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useUserPreferences } from '../contexts/UserPreferencesContext';
 import { usePlaylist } from '../contexts/PlaylistContext';
+import { rewriteImageUrl } from '../utils/urlRewriter';
 
 export default function Profile({ userData, onClose, onNavigate }) {
   const { t } = useLanguage();
@@ -270,7 +271,7 @@ export default function Profile({ userData, onClose, onNavigate }) {
                     <div className="relative w-16 h-20 flex-shrink-0 bg-slate-800 overflow-hidden">
                       {item.image ? (
                         <img
-                          src={item.image}
+                          src={rewriteImageUrl(item.image)}
                           alt={item.name}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           onError={(e) => {

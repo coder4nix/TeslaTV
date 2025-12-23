@@ -4,6 +4,7 @@ import { useLanguage } from './contexts/LanguageContext';
 import SeriesDetail from './SeriesDetail';
 import Breadcrumb from './components/Breadcrumb';
 import CategoryTabsContainer from './components/CategoryTabsContainer';
+import { rewriteImageUrl } from './utils/urlRewriter';
 
 export default function Series({ userData, isActive, initialSelectedSeriesId, initialSelectedCategory, onTabChange }) {
   const { t } = useLanguage();
@@ -309,7 +310,7 @@ export default function Series({ userData, isActive, initialSelectedSeriesId, in
                 <div className="relative aspect-[2/3] bg-slate-800 rounded-lg overflow-hidden mb-2">
                   {item.cover && (
                     <img
-                      src={item.cover}
+                      src={rewriteImageUrl(item.cover)}
                       alt={item.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       onError={(e) => e.target.style.display = 'none'}

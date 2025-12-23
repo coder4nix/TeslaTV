@@ -5,6 +5,7 @@ import MovieDetail from './MovieDetail';
 import Breadcrumb from './components/Breadcrumb';
 import CategoryTabsContainer from './components/CategoryTabsContainer';
 import { isTmdbEnabled, getMovieDetailsByName, getPosterUrl, extractYear } from './services/tmdb';
+import { rewriteImageUrl } from './utils/urlRewriter';
 
 export default function Movies({ userData, isActive, initialSelectedMovieId, initialSelectedCategory, onTabChange }) {
   const { t } = useLanguage();
@@ -207,8 +208,9 @@ export default function Movies({ userData, isActive, initialSelectedMovieId, ini
       return tmdbPosterCache[movie.name];
     }
 
-    // Return local poster for now, TMDB will be fetched lazily
-    return movie.stream_icon || movie.cover;
+    // Return local poster with URL rewriting for proxy
+    const localPoster = movie.stream_icon || movie.cover;
+    return rewriteImageUrl(localPoster);
   };
 
   // Lazily fetch TMDB poster for a movie
