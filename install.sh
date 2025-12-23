@@ -525,7 +525,33 @@ EOF
 EOF
     fi
 
+    # EPG Proxy (immer hinzufügen für externe EPG-Quellen)
     cat >> "$NGINX_CONFIG" << 'EOF'
+
+    # EPG Proxy für externe EPG-Quellen (CORS-Fix)
+    location /epg-proxy/ {
+        proxy_pass http://127.0.0.1:3001/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # CORS Headers
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Content-Type" always;
+
+        # Timeouts für große EPG-Dateien
+        proxy_connect_timeout 60;
+        proxy_send_timeout 120;
+        proxy_read_timeout 120;
+
+        # Buffering für Downloads
+        proxy_buffering on;
+        proxy_buffer_size 128k;
+        proxy_buffers 4 256k;
+        proxy_busy_buffers_size 256k;
+    }
 
     # SPA Routing
     location / {
@@ -676,6 +702,53 @@ EOF
     print_success "Update-Script erstellt: $APP_DIR/update.sh"
 }
 
+setup_epg_proxy() {
+    print_header "EPG Proxy Setup"
+
+    if [[ ! -f "$APP_DIR/epg-proxy.js" ]]; then
+        print_warning "epg-proxy.js nicht gefunden, überspringe EPG Proxy Setup"
+        return
+    fi
+
+    print_info "Erstelle EPG Proxy Service..."
+
+    # Systemd Service erstellen
+    cat > /etc/systemd/system/tesla-tv-epg-proxy.service << EOF
+[Unit]
+Description=Tesla TV EPG Proxy
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=$APP_DIR
+ExecStart=/usr/bin/node $APP_DIR/epg-proxy.js
+Restart=always
+RestartSec=10
+Environment=NODE_ENV=production
+Environment=EPG_PROXY_PORT=3001
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    print_success "Systemd Service erstellt"
+
+    # Service aktivieren und starten
+    print_info "Aktiviere EPG Proxy Service..."
+    systemctl daemon-reload
+    systemctl enable tesla-tv-epg-proxy > /dev/null 2>&1
+    systemctl start tesla-tv-epg-proxy
+
+    # Prüfe ob Service läuft
+    sleep 2
+    if systemctl is-active --quiet tesla-tv-epg-proxy; then
+        print_success "EPG Proxy läuft auf Port 3001"
+    else
+        print_warning "EPG Proxy konnte nicht gestartet werden"
+        print_info "Logs: journalctl -u tesla-tv-epg-proxy"
+    fi
+}
 
 final_checks() {
     print_header "Abschluss-Checks"
@@ -991,6 +1064,7 @@ EOF
     configure_nginx
     setup_ssl
     create_update_script
+    setup_epg_proxy
 
     # Final
     final_checks
@@ -999,8 +1073,187 @@ EOF
     print_info "Ende: $(date)"
 }
 
+###############################################################################
+# Update Function
+###############################################################################
+
+update_app() {
+    clear
+
+    echo -e "${BLUE}"
+    cat << "EOF"
+╔════════════════════════════════════════════════════════════════╗
+║                                                                ║
+║                    TESLA TV UPDATE                             ║
+║                                                                ║
+╚════════════════════════════════════════════════════════════════╝
+EOF
+    echo -e "${NC}"
+
+    # Lade gespeicherte Konfiguration
+    if [[ -f /etc/tesla-tv/config.sh ]]; then
+        source /etc/tesla-tv/config.sh
+        print_success "Konfiguration geladen von /etc/tesla-tv/config.sh"
+    elif [[ -f /tmp/tesla-tv-config.sh ]]; then
+        source /tmp/tesla-tv-config.sh
+        print_success "Konfiguration geladen von /tmp/tesla-tv-config.sh"
+    else
+        # Standard-Werte
+        APP_DIR="/var/www/tesla-tv"
+        print_warning "Keine gespeicherte Konfiguration gefunden, verwende Standard: $APP_DIR"
+    fi
+
+    # Prüfe ob Installation existiert
+    if [[ ! -d "$APP_DIR" ]]; then
+        print_error "Tesla TV nicht gefunden in $APP_DIR"
+        print_info "Bitte führen Sie zuerst eine Installation durch: ./install.sh"
+        exit 1
+    fi
+
+    if [[ ! -d "$APP_DIR/.git" ]]; then
+        print_error "Kein Git Repository in $APP_DIR"
+        exit 1
+    fi
+
+    print_info "Update-Verzeichnis: $APP_DIR"
+    echo ""
+
+    cd "$APP_DIR"
+
+    # Aktuelle Version anzeigen
+    CURRENT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
+    print_info "Aktuelle Version: $CURRENT_COMMIT (Branch: $CURRENT_BRANCH)"
+
+    # Remote Updates prüfen
+    print_info "Prüfe auf Updates..."
+    git fetch origin --quiet
+
+    LOCAL=$(git rev-parse HEAD)
+    REMOTE=$(git rev-parse @{u} 2>/dev/null || git rev-parse origin/$CURRENT_BRANCH 2>/dev/null || echo "")
+
+    if [[ -z "$REMOTE" ]]; then
+        print_warning "Konnte Remote nicht ermitteln"
+    elif [[ "$LOCAL" == "$REMOTE" ]]; then
+        print_success "Tesla TV ist bereits auf dem neuesten Stand!"
+        echo ""
+        read -p "Trotzdem neu bauen? (y/n) " -n 1 -r
+        echo ""
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 0
+        fi
+    else
+        # Zeige neue Commits
+        echo ""
+        print_info "Neue Änderungen verfügbar:"
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        git log --oneline HEAD..@{u} 2>/dev/null || git log --oneline HEAD..origin/$CURRENT_BRANCH 2>/dev/null | head -10
+        echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+
+        read -p "Update durchführen? (y/n) " -n 1 -r
+        echo ""
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_info "Update abgebrochen"
+            exit 0
+        fi
+    fi
+
+    print_header "Update wird durchgeführt"
+
+    # Lokale Änderungen sichern/verwerfen
+    if [[ -n $(git status --porcelain) ]]; then
+        print_warning "Lokale Änderungen gefunden"
+        read -p "Lokale Änderungen verwerfen? (y/n) " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            git reset --hard HEAD
+            git clean -fd
+            print_success "Lokale Änderungen verworfen"
+        else
+            print_warning "Update mit lokalen Änderungen könnte Konflikte verursachen"
+        fi
+    fi
+
+    # Pull neueste Version
+    print_info "Lade neueste Version..."
+    if ! git pull origin $CURRENT_BRANCH; then
+        print_error "Git pull fehlgeschlagen"
+        exit 1
+    fi
+
+    NEW_COMMIT=$(git rev-parse --short HEAD)
+    print_success "Aktualisiert auf: $NEW_COMMIT"
+
+    # Dependencies installieren
+    print_info "Prüfe Abhängigkeiten..."
+    npm install --production=false
+
+    # Fix permissions
+    if [[ -d "node_modules/.bin" ]]; then
+        chmod -R +x node_modules/.bin/ 2>/dev/null || true
+    fi
+    print_success "Abhängigkeiten installiert"
+
+    # Build
+    print_info "Baue Production Version..."
+    if ! npm run build 2>/dev/null; then
+        print_warning "npm run build fehlgeschlagen, versuche npx..."
+        if ! npx vite build; then
+            print_error "Build fehlgeschlagen"
+            exit 1
+        fi
+    fi
+
+    if [[ ! -d "dist" ]]; then
+        print_error "Build fehlgeschlagen - dist/ nicht gefunden"
+        exit 1
+    fi
+    print_success "Build erfolgreich"
+
+    # Berechtigungen setzen
+    print_info "Setze Berechtigungen..."
+    chown -R www-data:www-data "$APP_DIR"
+    chmod -R 755 "$APP_DIR"
+    print_success "Berechtigungen gesetzt"
+
+    # Nginx reload
+    print_info "Lade Nginx neu..."
+    if nginx -t > /dev/null 2>&1; then
+        systemctl reload nginx
+        print_success "Nginx neu geladen"
+    else
+        print_warning "Nginx Konfiguration fehlerhaft, überspringe Reload"
+    fi
+
+    # Zusammenfassung
+    echo ""
+    echo -e "${GREEN}"
+    cat << "EOF"
+╔════════════════════════════════════════════════════════════════╗
+║                     UPDATE ERFOLGREICH!                        ║
+╚════════════════════════════════════════════════════════════════╝
+EOF
+    echo -e "${NC}"
+
+    echo -e "${BLUE}Version:${NC} $CURRENT_COMMIT → $NEW_COMMIT"
+
+    if [[ -n "$DOMAIN" ]]; then
+        echo -e "${BLUE}URL:${NC}     https://$DOMAIN"
+    else
+        SERVER_IP=$(hostname -I | awk '{print $1}')
+        echo -e "${BLUE}URL:${NC}     http://$SERVER_IP"
+    fi
+
+    echo ""
+}
+
 # Command line argument handling
 case "${1:-}" in
+    --update|update|-U)
+        check_root
+        update_app
+        ;;
     --uninstall|uninstall|-u)
         check_root
         uninstall
@@ -1010,6 +1263,7 @@ case "${1:-}" in
         echo ""
         echo "Verwendung:"
         echo "  $0              - Installation starten (interaktiv)"
+        echo "  $0 --update     - Tesla TV aktualisieren"
         echo "  $0 --uninstall  - Tesla TV deinstallieren"
         echo "  $0 --help       - Diese Hilfe anzeigen"
         echo ""

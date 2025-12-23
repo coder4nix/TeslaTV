@@ -119,6 +119,14 @@ export const saveEpgSettings = (settings) => {
 };
 
 /**
+ * Check if we're running in production (HTTPS)
+ */
+const isProduction = () => {
+  return window.location.protocol === 'https:' ||
+         (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1');
+};
+
+/**
  * Download and decompress XML.gz file
  */
 export const downloadEpgFile = async (url, onProgress) => {
@@ -128,11 +136,18 @@ export const downloadEpgFile = async (url, onProgress) => {
     // Get EPG settings to check for CORS proxy configuration
     const settings = getEpgSettings();
 
-    // Use configured CORS proxy if enabled
+    // Determine which proxy to use
     let finalUrl = url;
-    if (settings.useCorsProxy && settings.corsProxyUrl) {
-      // Replace {URL} placeholder with the actual URL
+
+    // In production, always use local EPG proxy (avoids CORS issues)
+    if (isProduction()) {
+      // Use local EPG proxy endpoint
+      finalUrl = `/epg-proxy/?url=${encodeURIComponent(url)}`;
+      console.log('[EPG] Using local proxy (production mode)');
+    } else if (settings.useCorsProxy && settings.corsProxyUrl) {
+      // In development, use configured CORS proxy if enabled
       finalUrl = settings.corsProxyUrl.replace('{URL}', encodeURIComponent(url));
+      console.log('[EPG] Using external CORS proxy (development mode)');
     }
 
     console.log('[EPG] Downloading from:', finalUrl);
