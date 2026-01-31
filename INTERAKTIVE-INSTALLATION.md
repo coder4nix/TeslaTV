@@ -12,7 +12,7 @@ Das `install.sh` Script ist jetzt **vollständig interaktiv**! Sie müssen das S
 nano install.sh
 
 # Zeilen manuell ändern
-GITHUB_REPO="https://github.com/YOUR_USERNAME/tesla-tv.git"
+GITHUB_REPO="https://github.com/coder4nix/TeslaTV.git"
 DOMAIN="your-domain.com"
 
 # Speichern und pushen
@@ -36,7 +36,7 @@ Wenn Sie `./install.sh` starten, werden Sie nacheinander gefragt:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. GitHub Repository URL
-   Beispiel: https://github.com/username/tesla-tv.git
+   Beispiel: https://github.com/coder4nix/TeslaTV.git
 
    GitHub URL: _
 ```
@@ -47,8 +47,8 @@ Wenn Sie `./install.sh` starten, werden Sie nacheinander gefragt:
 - ⚠ Bei ungültigem Format: Bestätigung erforderlich
 
 **Beispiele:**
-- `https://github.com/tesla-user/tesla-tv.git` ✅
-- `git@github.com:tesla-user/tesla-tv.git` ✅
+- `https://github.com/coder4nix/TeslaTV.git` ✅
+- `git@github.com:coder4nix/TeslaTV.git` ✅
 
 ### 2. Domain Name (Optional)
 ```
@@ -101,7 +101,7 @@ Wenn Sie `./install.sh` starten, werden Sie nacheinander gefragt:
 Zusammenfassung der Konfiguration:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  GitHub Repository:  https://github.com/tesla-user/tesla-tv.git
+  GitHub Repository:  https://github.com/coder4nix/TeslaTV.git
   Domain:             tesla-tv.beispiel.de
   SSL:                y
   SSL Email:          admin@beispiel.de
@@ -135,11 +135,11 @@ root@vps:~# ./install.sh
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. GitHub Repository URL
-   Beispiel: https://github.com/username/tesla-tv.git
+   Beispiel: https://github.com/coder4nix/TeslaTV.git
 
-   GitHub URL: https://github.com/meintesla/tesla-tv.git
+   GitHub URL: https://github.com/coder4nix/TeslaTV.git
 
-✓ GitHub URL: https://github.com/meintesla/tesla-tv.git
+✓ GitHub URL: https://github.com/coder4nix/TeslaTV.git
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 2. Domain Name (Optional)
@@ -169,7 +169,7 @@ root@vps:~# ./install.sh
 Zusammenfassung der Konfiguration:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  GitHub Repository:  https://github.com/meintesla/tesla-tv.git
+  GitHub Repository:  https://github.com/coder4nix/TeslaTV.git
   Domain:             tv.meineseite.de
   SSL:                y
   SSL Email:          admin@meineseite.de
@@ -194,9 +194,9 @@ root@vps:~# ./install.sh
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 1. GitHub Repository URL
 
-   GitHub URL: https://github.com/user/tesla-tv.git
+   GitHub URL: https://github.com/coder4nix/TeslaTV.git
 
-✓ GitHub URL: https://github.com/user/tesla-tv.git
+✓ GitHub URL: https://github.com/coder4nix/TeslaTV.git
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 2. Domain Name (Optional)
@@ -216,7 +216,7 @@ root@vps:~# ./install.sh
 Zusammenfassung der Konfiguration:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  GitHub Repository:  https://github.com/user/tesla-tv.git
+  GitHub Repository:  https://github.com/coder4nix/TeslaTV.git
   Domain:             Keine (IP-basiert)
   SSL:                n
   Install Verzeichnis: /var/www/tesla-tv
@@ -303,7 +303,7 @@ Sie können das Script auch mit vordefinierten Werten verwenden:
 
 ```bash
 # Umgebungsvariablen setzen
-export GITHUB_REPO="https://github.com/user/tesla-tv.git"
+export GITHUB_REPO="https://github.com/coder4nix/TeslaTV.git"
 export DOMAIN="tv.example.com"
 export SETUP_SSL="y"
 export SSL_EMAIL="admin@example.com"

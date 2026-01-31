@@ -13,7 +13,7 @@
 
 GitHub zeigt Ihnen dann die Repository URL, z.B.:
 ```
-https://github.com/IHR_USERNAME/tesla-tv.git
+https://github.com/coder4nix/TeslaTV.git
 ```
 
 ## Schritt 2: Lokales Projekt zu GitHub pushen
@@ -33,7 +33,7 @@ git add .
 git commit -m "Initial commit: Tesla TV Application with all features"
 
 # GitHub Repository als Remote hinzufügen
-git remote add origin https://github.com/IHR_USERNAME/tesla-tv.git
+git remote add origin https://github.com/coder4nix/TeslaTV.git
 
 # Prüfen ob Remote korrekt ist
 git remote -v
@@ -59,7 +59,7 @@ Nach erfolgreichem Push:
    ```
    zu Ihrer echten GitHub URL:
    ```bash
-   GITHUB_REPO="https://github.com/IHR_USERNAME/tesla-tv.git"
+   GITHUB_REPO="https://github.com/coder4nix/TeslaTV.git"
    ```
 3. Speichern und erneut zu GitHub pushen:
    ```bash
@@ -121,7 +121,7 @@ cat ~/.ssh/id_ed25519.pub
 # GitHub → Settings → SSH and GPG keys → New SSH key
 
 # Remote URL auf SSH ändern
-git remote set-url origin git@github.com:IHR_USERNAME/tesla-tv.git
+git remote set-url origin git@github.com:coder4nix/TeslaTV.git
 ```
 
 ### Problem: "Repository not found"
@@ -176,7 +176,7 @@ cat ~/.ssh/id_ed25519.pub
 ### Option 2: Personal Access Token
 ```bash
 # Im install.sh ändern:
-GITHUB_REPO="https://TOKEN@github.com/IHR_USERNAME/tesla-tv.git"
+GITHUB_REPO="https://TOKEN@github.com/coder4nix/TeslaTV.git"
 ```
 
 ## Backup Strategie

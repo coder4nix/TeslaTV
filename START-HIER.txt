@@ -32,7 +32,7 @@ Ich habe ein komplettes Installations-Script erstellt, das:
 6. Klicken Sie "Create repository"
 
 GitHub zeigt Ihnen dann die URL:
-https://github.com/IHR_USERNAME/tesla-tv.git
+https://github.com/coder4nix/TeslaTV.git
 
 KOPIEREN SIE DIESE URL!
 
@@ -45,7 +45,7 @@ KOPIEREN SIE DIESE URL!
 
   cd C:\Users\ozgr\Documents\tesla-tv
 
-  git remote add origin https://github.com/IHR_USERNAME/tesla-tv.git
+  git remote add origin https://github.com/coder4nix/TeslaTV.git
 
   git push -u origin master
 
